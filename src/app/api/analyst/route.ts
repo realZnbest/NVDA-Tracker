@@ -1,35 +1,20 @@
 import { NextResponse } from "next/server";
 import { getRecommendationTrends, FinnhubError } from "@/lib/finnhub";
-import { getAnalystTargets } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 
 export async function GET() {
-  const [trendsResult, targetsResult] = await Promise.allSettled([
-    getRecommendationTrends(SYMBOL),
-    getAnalystTargets(SYMBOL),
-  ]);
-
-  const trends = trendsResult.status === "fulfilled" ? trendsResult.value : null;
-  const targets = targetsResult.status === "fulfilled" ? targetsResult.value : null;
-
-  if (!trends && !targets) {
-    const err = trendsResult.status === "rejected" ? trendsResult.reason : targetsResult.status === "rejected" ? targetsResult.reason : null;
-    if (err instanceof FinnhubError && err.message === "MISSING_API_KEY") {
-      return NextResponse.json({ error: "MISSING_API_KEY" }, { status: 200 });
+  try {
+    const trends = await getRecommendationTrends(SYMBOL);
+    if (!trends || trends.length === 0) {
+      return NextResponse.json({ error: "NO_DATA" }, { status: 200 });
     }
-    return NextResponse.json({ error: "NO_DATA" }, { status: 200 });
+    return NextResponse.json({
+      trends: trends.sort((a, b) => a.period.localeCompare(b.period)),
+    });
+  } catch (err) {
+    if (err instanceof FinnhubError) {
+      return NextResponse.json({ error: err.message }, { status: 200 });
+    }
+    return NextResponse.json({ error: "UNKNOWN_ERROR" }, { status: 500 });
   }
-
-  return NextResponse.json({
-    trends: trends?.sort((a, b) => a.period.localeCompare(b.period)) ?? null,
-    targets,
-    // Diagnostic only (not secret) — lets us see exactly why the Yahoo fetch failed
-    // without needing access to server logs.
-    targetsError:
-      targetsResult.status === "rejected"
-        ? targetsResult.reason instanceof Error
-          ? targetsResult.reason.message
-          : String(targetsResult.reason)
-        : null,
-  });
 }
