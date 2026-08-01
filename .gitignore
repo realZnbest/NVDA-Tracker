@@ -24,14 +24,19 @@
 .DS_Store
 *.pem
 
+# editors
+.vscode/
+.idea/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — never commit real secrets, but keep the .example templates
 .env*
+!.env*.example
 
 # vercel
 .vercel
