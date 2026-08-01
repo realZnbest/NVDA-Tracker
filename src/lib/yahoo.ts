@@ -94,40 +94,51 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
   const closes = chartResult.indicators.quote[0].close;
   const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? null;
   const regularPrice = meta.regularMarketPrice;
+  const session = computeSession(period);
+  const now = Date.now() / 1000;
 
-  // Prefer Yahoo's live meta fields (only populated during the active session);
-  // once the window has passed, derive the last real print from the intraday bars instead.
   let pre: ExtendedHoursQuote["pre"] = null;
-  if (meta.preMarketPrice !== undefined) {
-    pre = {
-      price: meta.preMarketPrice,
-      change: meta.preMarketChange ?? 0,
-      changePercent: meta.preMarketChangePercent ?? 0,
-    };
-  } else if (period && previousClose !== null) {
-    const price = lastCloseInWindow(timestamps, closes, period.pre.start, period.pre.end);
-    if (price !== null) {
-      const change = price - previousClose;
-      pre = { price, change, changePercent: (change / previousClose) * 100 };
-    }
-  }
-
   let post: ExtendedHoursQuote["post"] = null;
-  if (meta.postMarketPrice !== undefined) {
-    post = {
-      price: meta.postMarketPrice,
-      change: meta.postMarketChange ?? 0,
-      changePercent: meta.postMarketChangePercent ?? 0,
-    };
-  } else if (period) {
-    const price = lastCloseInWindow(timestamps, closes, period.post.start, period.post.end);
-    if (price !== null) {
-      const change = price - regularPrice;
-      post = { price, change, changePercent: (change / regularPrice) * 100 };
+
+  // Only surface the ONE slot that is chronologically still relevant right now — never
+  // a stale pre-market print left over from a trading day whose regular session (and
+  // possibly post-market session too) has already happened since.
+  if (session === "pre" && period) {
+    if (meta.preMarketPrice !== undefined) {
+      pre = {
+        price: meta.preMarketPrice,
+        change: meta.preMarketChange ?? 0,
+        changePercent: meta.preMarketChangePercent ?? 0,
+      };
+    } else if (previousClose !== null) {
+      const price = lastCloseInWindow(timestamps, closes, period.pre.start, period.pre.end);
+      if (price !== null) {
+        const change = price - previousClose;
+        pre = { price, change, changePercent: (change / previousClose) * 100 };
+      }
+    }
+  } else if (
+    period &&
+    (session === "post" || (session === "closed" && now >= period.post.end))
+  ) {
+    // Live after-hours, or the market is fully closed and the most recent session was
+    // this day's post-market — keep showing that last print until the next pre-market opens.
+    if (session === "post" && meta.postMarketPrice !== undefined) {
+      post = {
+        price: meta.postMarketPrice,
+        change: meta.postMarketChange ?? 0,
+        changePercent: meta.postMarketChangePercent ?? 0,
+      };
+    } else {
+      const price = lastCloseInWindow(timestamps, closes, period.post.start, period.post.end);
+      if (price !== null) {
+        const change = price - regularPrice;
+        post = { price, change, changePercent: (change / regularPrice) * 100 };
+      }
     }
   }
 
-  const result: ExtendedHoursQuote = { session: computeSession(period), pre, post };
+  const result: ExtendedHoursQuote = { session, pre, post };
 
   extendedCache.set(symbol, { expires: Date.now() + 15_000, data: result });
   return result;
