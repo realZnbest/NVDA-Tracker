@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { IconArrowDown, IconArrowUp } from "./icons";
+import { NotificationBell } from "./notification-bell";
 import type { FinnhubQuote } from "@/lib/finnhub";
 import type { ExtendedHoursQuote } from "@/lib/yahoo";
 
@@ -53,6 +54,7 @@ export function QuoteHeader() {
           <span className="telemetry rounded px-2 py-0.5 text-[11px] bg-ch-price-dim text-ch-price">
             NASDAQ · NVDA
           </span>
+          <NotificationBell className="sm:hidden" />
         </div>
 
         {status === "ready" && quote ? (
