@@ -3,24 +3,40 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
+  createSeriesMarkers,
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
+  LineStyle,
   type IChartApi,
   type ISeriesApi,
+  type IPriceLine,
+  type SeriesMarker,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { TIMEFRAMES, type TimeframeKey } from "@/lib/timeframes";
-import { bollinger, macd, rsi, sma } from "@/lib/indicators";
+import {
+  bollinger,
+  computeSupportResistance,
+  detectStructureBreaks,
+  findPivots,
+  macd,
+  movingAverageOf,
+  rsi,
+  sma,
+} from "@/lib/indicators";
 import type { FinnhubCandles } from "@/lib/finnhub";
 
 const CH = {
   price: "#79b900",
   volume: "#3fc4d8",
   rsi: "#b28cf2",
+  rsiMa: "#e3a94b",
   macd: "#2fd6a6",
   up: "#34d17c",
   down: "#ef5b5b",
+  choch: "#f2c879",
   text: "#9aa4b2",
   seam: "#262c35",
 };
@@ -32,14 +48,27 @@ interface Params {
   bbPeriod: number;
   bbMult: number;
   rsiPeriod: number;
+  rsiMaPeriod: number;
+  swingBars: number;
 }
 
-const DEFAULT_PARAMS: Params = { ma1: 20, ma2: 50, ma3: 200, bbPeriod: 20, bbMult: 2, rsiPeriod: 14 };
+const DEFAULT_PARAMS: Params = {
+  ma1: 20,
+  ma2: 50,
+  ma3: 200,
+  bbPeriod: 20,
+  bbMult: 2,
+  rsiPeriod: 14,
+  rsiMaPeriod: 14,
+  swingBars: 5,
+};
 
 export function PriceChart() {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick" | "Line" | "Histogram">>>({});
+  const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
+  const srLinesRef = useRef<IPriceLine[]>([]);
 
   const [timeframe, setTimeframe] = useState<TimeframeKey>("1Y");
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
@@ -51,7 +80,10 @@ export function PriceChart() {
   const [showMa3, setShowMa3] = useState(false);
   const [showBollinger, setShowBollinger] = useState(false);
   const [showRsi, setShowRsi] = useState(true);
+  const [showRsiMa, setShowRsiMa] = useState(true);
   const [showMacd, setShowMacd] = useState(true);
+  const [showSR, setShowSR] = useState(true);
+  const [showStructure, setShowStructure] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,13 +113,26 @@ export function PriceChart() {
   const computed = useMemo(() => {
     if (!candles) return null;
     const closes = candles.c;
+    const rsiSeries = rsi(closes, params.rsiPeriod);
+    const pivots = findPivots(candles.t, candles.h, candles.l, params.swingBars, params.swingBars);
+    const lastClose = closes[closes.length - 1];
     return {
       ma1: sma(closes, params.ma1),
       ma2: sma(closes, params.ma2),
       ma3: sma(closes, params.ma3),
       bb: bollinger(closes, params.bbPeriod, params.bbMult),
-      rsi: rsi(closes, params.rsiPeriod),
+      rsi: rsiSeries,
+      rsiMa: movingAverageOf(rsiSeries, params.rsiMaPeriod),
       macd: macd(closes),
+      sr: computeSupportResistance(pivots, lastClose),
+      structure: detectStructureBreaks(
+        candles.t,
+        candles.h,
+        candles.l,
+        closes,
+        params.swingBars,
+        params.swingBars
+      ),
     };
   }, [candles, params]);
 
@@ -128,6 +173,7 @@ export function PriceChart() {
       0
     );
     candleSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.02 } });
+    markersPluginRef.current = createSeriesMarkers(candleSeries, []);
 
     const ma1Series = chart.addSeries(LineSeries, { color: CH.price, lineWidth: 1, priceLineVisible: false }, 0);
     const ma2Series = chart.addSeries(LineSeries, { color: "#8fb8ff", lineWidth: 1, priceLineVisible: false }, 0);
@@ -143,6 +189,7 @@ export function PriceChart() {
     volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
 
     const rsiSeries = chart.addSeries(LineSeries, { color: CH.rsi, lineWidth: 2, priceLineVisible: false }, 2);
+    const rsiMaSeries = chart.addSeries(LineSeries, { color: CH.rsiMa, lineWidth: 1, priceLineVisible: false }, 2);
     const rsiUpper = chart.addSeries(LineSeries, { color: "rgba(239,74,74,0.4)", lineWidth: 1, priceLineVisible: false }, 2);
     const rsiLower = chart.addSeries(LineSeries, { color: "rgba(52,209,124,0.4)", lineWidth: 1, priceLineVisible: false }, 2);
 
@@ -159,6 +206,7 @@ export function PriceChart() {
       bbLower: bbLowerSeries,
       volume: volumeSeries,
       rsi: rsiSeries,
+      rsiMa: rsiMaSeries,
       rsiUpper,
       rsiLower,
       macd: macdSeries,
@@ -175,6 +223,8 @@ export function PriceChart() {
     return () => {
       chart.remove();
       chartRef.current = null;
+      markersPluginRef.current = null;
+      srLinesRef.current = [];
     };
   }, []);
 
@@ -213,6 +263,7 @@ export function PriceChart() {
     );
 
     s.rsi.setData(showRsi ? line(computed.rsi) : []);
+    s.rsiMa.setData(showRsi && showRsiMa ? line(computed.rsiMa) : []);
     s.rsiUpper.setData(
       showRsi ? times.map((t) => ({ time: t as UTCTimestamp, value: 70 })) : []
     );
@@ -234,8 +285,49 @@ export function PriceChart() {
         : []
     );
 
+    srLinesRef.current.forEach((l) => s.candle.removePriceLine(l));
+    srLinesRef.current = [];
+    if (showSR) {
+      for (const level of computed.sr) {
+        const isResistance = level.type === "resistance";
+        srLinesRef.current.push(
+          s.candle.createPriceLine({
+            price: level.price,
+            color: isResistance ? "rgba(239,91,91,0.7)" : "rgba(52,209,124,0.7)",
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: isResistance ? "แนวต้าน" : "แนวรับ",
+          })
+        );
+      }
+    }
+
+    const markers: SeriesMarker<Time>[] = showStructure
+      ? computed.structure.map((event) => ({
+          time: event.time as UTCTimestamp,
+          position: event.direction === "up" ? "belowBar" : "aboveBar",
+          shape: event.direction === "up" ? "arrowUp" : "arrowDown",
+          color: event.kind === "CHoCH" ? CH.choch : event.direction === "up" ? CH.up : CH.down,
+          text: event.kind,
+        }))
+      : [];
+    markersPluginRef.current?.setMarkers(markers);
+
     chartRef.current.timeScale().fitContent();
-  }, [candles, computed, showMa1, showMa2, showMa3, showBollinger, showRsi, showMacd]);
+  }, [
+    candles,
+    computed,
+    showMa1,
+    showMa2,
+    showMa3,
+    showBollinger,
+    showRsi,
+    showRsiMa,
+    showMacd,
+    showSR,
+    showStructure,
+  ]);
 
   const panesVisible = 2 + (showRsi ? 1 : 0) + (showMacd ? 1 : 0);
 
@@ -264,7 +356,10 @@ export function PriceChart() {
           <Toggle label={`MA${params.ma3}`} color="#ff9f6e" active={showMa3} onClick={() => setShowMa3((v) => !v)} />
           <Toggle label="Bollinger" color="#9aa4b2" active={showBollinger} onClick={() => setShowBollinger((v) => !v)} />
           <Toggle label={`RSI ${params.rsiPeriod}`} color={CH.rsi} active={showRsi} onClick={() => setShowRsi((v) => !v)} />
+          <Toggle label={`RSI MA${params.rsiMaPeriod}`} color={CH.rsiMa} active={showRsiMa} onClick={() => setShowRsiMa((v) => !v)} />
           <Toggle label="MACD" color={CH.macd} active={showMacd} onClick={() => setShowMacd((v) => !v)} />
+          <Toggle label="แนวรับ/แนวต้าน" color="#9aa4b2" active={showSR} onClick={() => setShowSR((v) => !v)} />
+          <Toggle label="BOS/CHoCH" color={CH.choch} active={showStructure} onClick={() => setShowStructure((v) => !v)} />
         </div>
 
         <details className="ml-auto text-[11px] text-text-muted">
@@ -275,6 +370,8 @@ export function PriceChart() {
             <ParamField label="MA ช้า" value={params.ma3} onChange={(v) => setParams((p) => ({ ...p, ma3: v }))} />
             <ParamField label="Bollinger คาบ" value={params.bbPeriod} onChange={(v) => setParams((p) => ({ ...p, bbPeriod: v }))} />
             <ParamField label="RSI คาบ" value={params.rsiPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiPeriod: v }))} />
+            <ParamField label="RSI MA คาบ" value={params.rsiMaPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiMaPeriod: v }))} />
+            <ParamField label="ช่วงยืนยันจุดกลับตัว" value={params.swingBars} onChange={(v) => setParams((p) => ({ ...p, swingBars: v }))} />
           </div>
         </details>
       </div>
