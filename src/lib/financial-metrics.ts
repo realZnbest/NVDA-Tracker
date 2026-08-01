@@ -2,12 +2,25 @@ import type { FinnhubReportedFinancials } from "./finnhub";
 
 type LineItem = { concept: string; label: string; value: number };
 
-function findValue(items: LineItem[] | undefined, candidates: string[]): number | null {
+/**
+ * Matches by exact XBRL concept tag first (stable across filings, unambiguous), then
+ * falls back to a whole-word label match. A naive label substring match is not safe here:
+ * e.g. "sales" is a substring of "Sales, general and administrative", which would get
+ * mismatched as revenue.
+ */
+function findByConceptOrLabel(
+  items: LineItem[] | undefined,
+  concepts: string[],
+  labelWords: string[]
+): number | null {
   if (!items) return null;
-  for (const candidate of candidates) {
-    const hit = items.find((item) =>
-      item.label.toLowerCase().includes(candidate.toLowerCase())
-    );
+  for (const concept of concepts) {
+    const hit = items.find((item) => item.concept === concept);
+    if (hit) return hit.value;
+  }
+  for (const word of labelWords) {
+    const re = new RegExp(`\\b${word}\\b`, "i");
+    const hit = items.find((item) => re.test(item.label));
     if (hit) return hit.value;
   }
   return null;
@@ -34,22 +47,50 @@ export function extractQuarterMetrics(
 ): QuarterMetrics {
   const { ic, bs, cf } = report.report;
 
-  const revenue = findValue(ic, ["total revenue", "revenues", "net revenue", "sales"]);
-  const netIncome = findValue(ic, ["net income", "net earnings"]);
-  const eps = findValue(ic, ["diluted", "earnings per share"]);
-  const grossProfit = findValue(ic, ["gross profit", "gross margin"]);
-  const operatingIncome = findValue(ic, ["operating income", "income from operations"]);
+  const revenue = findByConceptOrLabel(
+    ic,
+    ["us-gaap_Revenues", "us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax", "us-gaap_SalesRevenueNet"],
+    ["total revenue", "^revenue$", "net revenue"]
+  );
+  const netIncome = findByConceptOrLabel(
+    ic,
+    ["us-gaap_NetIncomeLoss"],
+    ["net income", "net earnings"]
+  );
+  const eps = findByConceptOrLabel(
+    ic,
+    ["us-gaap_EarningsPerShareDiluted", "us-gaap_EarningsPerShareBasic"],
+    ["diluted"]
+  );
+  const grossProfit = findByConceptOrLabel(ic, ["us-gaap_GrossProfit"], ["gross profit"]);
+  const operatingIncome = findByConceptOrLabel(
+    ic,
+    ["us-gaap_OperatingIncomeLoss"],
+    ["operating income", "income from operations"]
+  );
 
-  const longTermDebt = findValue(bs, ["long-term debt", "long term debt"]);
-  const shortTermDebt = findValue(bs, ["short-term debt", "current portion of long-term debt"]);
+  const longTermDebt = findByConceptOrLabel(
+    bs,
+    ["us-gaap_LongTermDebtNoncurrent", "us-gaap_LongTermDebt"],
+    ["long-term debt", "long term debt"]
+  );
+  const shortTermDebt = findByConceptOrLabel(
+    bs,
+    ["us-gaap_DebtCurrent", "us-gaap_ShortTermBorrowings", "us-gaap_LongTermDebtCurrent"],
+    ["short-term debt", "short term debt"]
+  );
   const totalDebt = longTermDebt !== null ? longTermDebt + (shortTermDebt ?? 0) : shortTermDebt;
 
-  const operatingCashFlow = findValue(cf, [
-    "net cash provided by operating",
-    "cash from operating",
-    "operating activities",
-  ]);
-  const capex = findValue(cf, ["purchases of property", "capital expenditures", "property and equipment"]);
+  const operatingCashFlow = findByConceptOrLabel(
+    cf,
+    ["us-gaap_NetCashProvidedByUsedInOperatingActivities"],
+    ["net cash provided by operating activities", "cash from operating activities"]
+  );
+  const capex = findByConceptOrLabel(
+    cf,
+    ["us-gaap_PaymentsToAcquireProductiveAssets", "us-gaap_PaymentsToAcquirePropertyPlantAndEquipment"],
+    ["purchases of property", "capital expenditures"]
+  );
   const freeCashFlow =
     operatingCashFlow !== null && capex !== null ? operatingCashFlow - Math.abs(capex) : null;
 

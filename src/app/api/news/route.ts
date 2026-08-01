@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCompanyNews, FinnhubError } from "@/lib/finnhub";
+import { filterRelevantNews } from "@/lib/news-filter";
 import { SYMBOL } from "@/lib/timeframes";
 
 function isoDate(d: Date) {
@@ -12,8 +13,7 @@ export async function GET() {
 
   try {
     const news = await getCompanyNews(SYMBOL, isoDate(from), isoDate(to));
-    const cleaned = news
-      .filter((n) => n.headline && n.summary)
+    const cleaned = filterRelevantNews(news)
       .sort((a, b) => b.datetime - a.datetime)
       .slice(0, 40);
     return NextResponse.json({ news: cleaned });

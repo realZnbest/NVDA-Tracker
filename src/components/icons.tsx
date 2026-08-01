@@ -89,3 +89,11 @@ export function IconExternal({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconSpark({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3.5 3.5M18 6l-3.5 3.5M6 18l3.5-3.5M18 18l-3.5-3.5" />
+    </svg>
+  );
+}
