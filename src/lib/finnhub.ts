@@ -102,6 +102,24 @@ export function getQuote(symbol: string) {
 // Note: Finnhub's /stock/candle endpoint is restricted to paid plans.
 // Historical price candles come from Yahoo Finance instead — see lib/yahoo.ts.
 
+export interface FinnhubRecommendationTrend {
+  symbol: string;
+  period: string;
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+}
+
+export function getRecommendationTrends(symbol: string) {
+  return fetchFinnhub<FinnhubRecommendationTrend[]>(
+    "/stock/recommendation",
+    { symbol },
+    6 * 60 * 60_000
+  );
+}
+
 export function getCompanyNews(symbol: string, from: string, to: string) {
   return fetchFinnhub<FinnhubNewsItem[]>(
     "/company-news",

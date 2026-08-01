@@ -1,6 +1,7 @@
 import { QuoteHeader } from "@/components/quote-header";
 import { PriceChart } from "@/components/price-chart";
 import { AnalysisPanel } from "@/components/analysis-panel";
+import { AnalystPanel } from "@/components/analyst-panel";
 
 export default function DashboardPage() {
   return (
@@ -8,7 +9,10 @@ export default function DashboardPage() {
       <QuoteHeader />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
         <PriceChart />
-        <AnalysisPanel />
+        <div className="flex flex-col gap-4">
+          <AnalysisPanel />
+          <AnalystPanel />
+        </div>
       </div>
     </div>
   );

@@ -144,6 +144,87 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
   return result;
 }
 
+export interface AnalystTargets {
+  targetHigh: number | null;
+  targetLow: number | null;
+  targetMean: number | null;
+  targetMedian: number | null;
+  recommendationKey: string | null;
+  numberOfAnalysts: number | null;
+}
+
+interface CrumbSession {
+  crumb: string;
+  cookie: string;
+  expires: number;
+}
+
+let crumbSession: CrumbSession | null = null;
+
+/**
+ * quoteSummary requires a "crumb" token tied to a cookie session — Yahoo's anti-scraping
+ * measure on this particular endpoint (the chart endpoint used elsewhere in this file
+ * needs no such thing). Fetched once and reused; refreshed automatically if a request
+ * using it fails, since the crumb can expire or get invalidated server-side.
+ */
+async function getCrumbSession(): Promise<CrumbSession> {
+  if (crumbSession && crumbSession.expires > Date.now()) return crumbSession;
+
+  const cookieRes = await fetch("https://fc.yahoo.com", {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    redirect: "manual",
+  });
+  const cookie = cookieRes.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  if (!cookie) throw new Error("YAHOO_NO_COOKIE");
+
+  const crumbRes = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
+    headers: { "User-Agent": "Mozilla/5.0", Cookie: cookie },
+  });
+  if (!crumbRes.ok) throw new Error(`YAHOO_CRUMB_HTTP_${crumbRes.status}`);
+  const crumb = await crumbRes.text();
+  if (!crumb || crumb.includes("<")) throw new Error("YAHOO_CRUMB_INVALID");
+
+  crumbSession = { crumb, cookie, expires: Date.now() + 55 * 60_000 };
+  return crumbSession;
+}
+
+export async function getAnalystTargets(symbol: string): Promise<AnalystTargets> {
+  const session = await getCrumbSession();
+  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=financialData&crumb=${encodeURIComponent(session.crumb)}`;
+
+  let res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0", Cookie: session.cookie },
+    cache: "no-store",
+  });
+
+  if (res.status === 401) {
+    // Crumb likely expired/invalidated — refresh once and retry.
+    crumbSession = null;
+    const fresh = await getCrumbSession();
+    res = await fetch(
+      `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=financialData&crumb=${encodeURIComponent(fresh.crumb)}`,
+      { headers: { "User-Agent": "Mozilla/5.0", Cookie: fresh.cookie }, cache: "no-store" }
+    );
+  }
+
+  if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
+  const data = await res.json();
+  const fd = data.quoteSummary?.result?.[0]?.financialData;
+  if (!fd) throw new Error("YAHOO_NO_DATA");
+
+  return {
+    targetHigh: fd.targetHighPrice?.raw ?? null,
+    targetLow: fd.targetLowPrice?.raw ?? null,
+    targetMean: fd.targetMeanPrice?.raw ?? null,
+    targetMedian: fd.targetMedianPrice?.raw ?? null,
+    recommendationKey: fd.recommendationKey ?? null,
+    numberOfAnalysts: fd.numberOfAnalystOpinions?.raw ?? null,
+  };
+}
+
 export async function getYahooCandles(
   symbol: string,
   range: string,
