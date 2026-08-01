@@ -1,4 +1,14 @@
-export type TimeframeKey = "1H" | "1D" | "5D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
+export type TimeframeKey =
+  | "1H"
+  | "1D"
+  | "5D"
+  | "1W"
+  | "1M"
+  | "3M"
+  | "6M"
+  | "YTD"
+  | "1Y"
+  | "5Y";
 
 export const TIMEFRAMES: {
   key: TimeframeKey;
@@ -12,6 +22,8 @@ export const TIMEFRAMES: {
   { key: "1W", label: "1 สัปดาห์", yahooRange: "5d", yahooInterval: "15m" },
   { key: "1M", label: "1 เดือน", yahooRange: "1mo", yahooInterval: "60m" },
   { key: "3M", label: "3 เดือน", yahooRange: "3mo", yahooInterval: "1d" },
+  { key: "6M", label: "6 เดือน", yahooRange: "6mo", yahooInterval: "1d" },
+  { key: "YTD", label: "ตั้งแต่ต้นปี", yahooRange: "ytd", yahooInterval: "1d" },
   { key: "1Y", label: "1 ปี", yahooRange: "1y", yahooInterval: "1d" },
   { key: "5Y", label: "5 ปี", yahooRange: "5y", yahooInterval: "1wk" },
 ];
