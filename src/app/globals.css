@@ -89,64 +89,77 @@ body {
   color: var(--text-primary);
 }
 
-/* rack-panel module: hairline seam, corner rivets, slight inset shadow */
-.module {
-  background: var(--panel);
-  border: 1px solid var(--seam);
-  border-radius: 3px;
-  position: relative;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-    0 1px 2px rgba(0, 0, 0, 0.5);
-}
+/*
+ * Custom component classes live in @layer components so Tailwind's utility layer
+ * (e.g. `absolute`, `static`) always wins the cascade over them when both are applied
+ * to the same element — unlayered CSS otherwise beats layered utilities regardless of
+ * source order, which previously made `.module` silently override `absolute` on the
+ * notification dropdown and broke its positioning.
+ */
+@layer components {
+  /* rack-panel module: hairline seam, corner rivets, slight inset shadow */
+  .module {
+    background: var(--panel);
+    border: 1px solid var(--seam);
+    border-radius: 3px;
+    position: relative;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+      0 1px 2px rgba(0, 0, 0, 0.5);
+  }
 
-.module::before,
-.module::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--rivet);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
-}
+  .module::before,
+  .module::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--rivet);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  }
 
-.module::before {
-  left: 6px;
-}
+  .module::before {
+    left: 6px;
+  }
 
-.module::after {
-  right: 6px;
-}
+  .module::after {
+    right: 6px;
+  }
 
-.module-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
+  .module-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
 
-.telemetry {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-}
+  .telemetry {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
 
-.scrollbar-thin::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--seam-bright);
-  border-radius: 4px;
-}
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--seam-bright);
+    border-radius: 4px;
+  }
 
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .lit {
+    animation: lit-pulse 1.6s ease-in-out infinite;
+  }
 }
 
 @keyframes lit-pulse {
@@ -157,8 +170,4 @@ body {
   50% {
     opacity: 0.55;
   }
-}
-
-.lit {
-  animation: lit-pulse 1.6s ease-in-out infinite;
 }
