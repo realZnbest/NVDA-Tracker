@@ -92,7 +92,7 @@ export function RackNav() {
       </div>
 
       {/* module tabs */}
-      <nav className="flex items-center px-2">
+      <nav className="flex items-center overflow-x-auto scrollbar-thin px-2">
         {NAV_ITEMS.map((item) => {
           const active = pathname?.startsWith(item.href);
           const Icon = item.icon;
@@ -100,13 +100,13 @@ export function RackNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2 px-4 py-3 text-sm border-b-2 transition-colors ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm border-b-2 transition-colors ${
                 active
                   ? "border-ch-price text-text-primary"
                   : "border-transparent text-text-secondary hover:text-text-primary"
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 shrink-0" />
               {item.label}
             </Link>
           );

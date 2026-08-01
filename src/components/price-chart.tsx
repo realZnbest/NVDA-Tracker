@@ -127,7 +127,9 @@ export function PriceChart() {
       },
       0
     );
-    const ma1Series = chart.addSeries(LineSeries, { color: "#f2c879", lineWidth: 1, priceLineVisible: false }, 0);
+    candleSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.02 } });
+
+    const ma1Series = chart.addSeries(LineSeries, { color: CH.price, lineWidth: 1, priceLineVisible: false }, 0);
     const ma2Series = chart.addSeries(LineSeries, { color: "#8fb8ff", lineWidth: 1, priceLineVisible: false }, 0);
     const ma3Series = chart.addSeries(LineSeries, { color: "#ff9f6e", lineWidth: 1, priceLineVisible: false }, 0);
     const bbUpperSeries = chart.addSeries(LineSeries, { color: "rgba(154,164,178,0.5)", lineWidth: 1, priceLineVisible: false }, 0);
@@ -138,6 +140,7 @@ export function PriceChart() {
       { color: CH.volume, priceFormat: { type: "volume" }, priceLineVisible: false },
       1
     );
+    volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
 
     const rsiSeries = chart.addSeries(LineSeries, { color: CH.rsi, lineWidth: 2, priceLineVisible: false }, 2);
     const rsiUpper = chart.addSeries(LineSeries, { color: "rgba(239,74,74,0.4)", lineWidth: 1, priceLineVisible: false }, 2);
@@ -205,7 +208,7 @@ export function PriceChart() {
       times.map((t, i) => ({
         time: t as UTCTimestamp,
         value: candles.v[i],
-        color: candles.c[i] >= candles.o[i] ? "rgba(52,209,124,0.5)" : "rgba(239,91,91,0.5)",
+        color: candles.c[i] >= candles.o[i] ? "rgba(63,196,216,0.7)" : "rgba(63,196,216,0.28)",
       }))
     );
 
