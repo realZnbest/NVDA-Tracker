@@ -35,7 +35,7 @@ Without these two set, the site still works fully as a read-only dashboard — y
 
 - Data provider is Finnhub's free tier (quote, news, financials — 60 requests/min, cached server-side) plus Yahoo Finance's free chart endpoint (historical candles, pre/post-market prices, and analyst price targets; Finnhub's own candle endpoint is paid-only).
 - The AI summary cards try a chain of providers in order — Gemini keys, then Groq keys, then OpenRouter keys, whichever are configured — falling through to the next one if a key hits its free-tier rate limit. Responses are cached server-side for 1 hour per page.
-- Alerts (price, RSI, MACD, MA cross, and portfolio P&L) are evaluated server-side and stored in `data/alerts.db` (SQLite). Evaluation is triggered by a scheduled job hitting `/api/alerts/check`, **not** by visitors having a tab open — see the Render Cron Job section below, which is what makes email delivery actually reliable.
+- Alerts (price, RSI, MACD, MA cross, and portfolio P&L) are evaluated server-side and stored in `data/alerts.db` (SQLite). Evaluation is triggered by a scheduled job hitting `/api/alerts/check`, **not** by visitors having a tab open — see "Scheduling alert checks" below, which is what makes email delivery actually reliable.
 - See `DESIGN.md` for the visual system and `PRODUCT.md` for product scope.
 
 ## Deploying to Render.com
@@ -50,17 +50,36 @@ Without these two set, the site still works fully as a read-only dashboard — y
    - **Runtime:** Node
    - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npm start`
-4. **Environment variables** (Environment tab): add everything from `.env.local.example` that you're using — at minimum `FINNHUB_API_KEY`. For edit access + email, add `OWNER_EMAIL` and `RESEND_API_KEY`. Generate a random string for `CRON_SECRET` (e.g. `openssl rand -hex 32`) — you'll reuse it in step 6.
+4. **Environment variables** (Environment tab): add everything from `.env.local.example` that you're using — at minimum `FINNHUB_API_KEY`. For edit access + email, add `OWNER_EMAIL` and `RESEND_API_KEY`. Generate a random string for `CRON_SECRET` (e.g. `openssl rand -hex 32`) — you'll reuse it below.
 5. **Persistent disk** (so your position/alerts survive a redeploy): Render's free tier has an ephemeral filesystem — without a disk, `data/alerts.db` resets every time you deploy. Add one under **Disks**: mount path `/var/data`, then add an environment variable `DATA_DIR=/var/data`. (A disk requires a paid instance type; on the free tier, your data will just reset on each deploy — everything else works fine.)
-6. **Render Cron Job** (makes alert emails actually fire while you're not looking — this is the whole point of email delivery):
-   - **New → Cron Job** in the same Render project.
-   - **Command:**
-     ```bash
-     curl -fsS -X POST https://<your-app>.onrender.com/api/alerts/check -H "X-Cron-Secret: <same value as CRON_SECRET>"
-     ```
-   - **Schedule:** `*/5 * * * *` (every 5 minutes) or `*/10 * * * *` (every 10) — either is fine for a stock that doesn't move minute-to-minute in a way that needs faster checking.
-   - Cron Jobs can't mount a persistent disk, which is exactly why this hits the web service over HTTP instead of touching the database directly — all the actual logic and DB access stays inside the one web service process.
-   - Cost: Render Cron Jobs have a $1/month minimum charge (no free tier for the cron resource itself, separate from the web service's own free tier).
-7. Deploy. First build takes a few minutes (it compiles the SQLite native module).
+6. Deploy. First build takes a few minutes (it compiles the SQLite native module).
+
+## Scheduling alert checks
+
+Something needs to hit `/api/alerts/check` on a schedule so alerts (and their emails) fire even when you're not looking — this is what makes email delivery actually reliable instead of relying on a visitor's tab being open. Two options, same effect:
+
+### Option A: GitHub Actions (free)
+
+Already set up in this repo at `.github/workflows/alert-check.yml`, on a `*/5 * * * *` schedule. Just add two repository secrets (GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**):
+
+- `APP_URL` — your deployed URL, e.g. `https://nvda-tracker.onrender.com` (no trailing slash)
+- `CRON_SECRET` — same value as the `CRON_SECRET` env var on Render
+
+Free and unlimited on a public repo (a private repo still gets 2,000 free minutes/month, and this job uses well under 1% of that). One honest caveat: GitHub only runs scheduled workflows on a best-effort basis — during periods of high platform load, a run can be delayed by several minutes past its scheduled time. Fine for a stock that doesn't need second-precision checking; not as punctual as a dedicated cron service.
+
+You can trigger a run manually anytime from the repo's **Actions** tab (`workflow_dispatch`) to test without waiting for the schedule.
+
+### Option B: Render Cron Job (paid, more punctual)
+
+- **New → Cron Job** in the same Render project.
+- **Command:**
+  ```bash
+  curl -fsS -X POST https://<your-app>.onrender.com/api/alerts/check -H "X-Cron-Secret: <same value as CRON_SECRET>"
+  ```
+- **Schedule:** `*/5 * * * *` or `*/10 * * * *`.
+- Cron Jobs can't mount a persistent disk, which is exactly why this hits the web service over HTTP instead of touching the database directly — all the actual logic and DB access stays inside the one web service process.
+- Cost: $1/month minimum (no free tier for the cron resource itself, separate from the web service's own free tier).
+
+Pick one — running both just means alerts get checked twice as often, which is harmless but pointless.
 
 That's it — no code changes needed for any of this; the app reads all of `FINNHUB_API_KEY`, `DATA_DIR`, `OWNER_EMAIL`, `RESEND_API_KEY`, and `CRON_SECRET` from the environment rather than assuming localhost.
