@@ -57,7 +57,13 @@ export function AnalystPanel() {
 
       {status === "ready" && data && (
         <div className="flex flex-col gap-4">
-          {data.targets && <PriceTargetRange targets={data.targets} price={price} />}
+          {data.targets ? (
+            <PriceTargetRange targets={data.targets} price={price} />
+          ) : (
+            <p className="text-xs text-text-muted">
+              ราคาเป้าหมายจาก Yahoo ดึงไม่สำเร็จตอนนี้ (อาจติดระบบกันบอทฝั่งเซิร์ฟเวอร์) ลองรีเฟรชอีกครั้งภายหลัง
+            </p>
+          )}
           {data.trends && data.trends.length > 0 && (
             <RatingBreakdown trend={data.trends[data.trends.length - 1]} />
           )}

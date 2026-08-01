@@ -161,6 +161,17 @@ interface CrumbSession {
 
 let crumbSession: CrumbSession | null = null;
 
+// A realistic desktop-browser header set — Yahoo's anti-bot check on this specific
+// endpoint is stricter than the chart endpoint above, and datacenter IPs (Render, etc.)
+// get flagged far more than a residential connection, so looking as browser-like as
+// possible matters here in a way it doesn't elsewhere in this file.
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
 /**
  * quoteSummary requires a "crumb" token tied to a cookie session — Yahoo's anti-scraping
  * measure on this particular endpoint (the chart endpoint used elsewhere in this file
@@ -171,7 +182,7 @@ async function getCrumbSession(): Promise<CrumbSession> {
   if (crumbSession && crumbSession.expires > Date.now()) return crumbSession;
 
   const cookieRes = await fetch("https://fc.yahoo.com", {
-    headers: { "User-Agent": "Mozilla/5.0" },
+    headers: BROWSER_HEADERS,
     redirect: "manual",
   });
   const cookie = cookieRes.headers
@@ -181,7 +192,7 @@ async function getCrumbSession(): Promise<CrumbSession> {
   if (!cookie) throw new Error("YAHOO_NO_COOKIE");
 
   const crumbRes = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
-    headers: { "User-Agent": "Mozilla/5.0", Cookie: cookie },
+    headers: { ...BROWSER_HEADERS, Cookie: cookie },
   });
   if (!crumbRes.ok) throw new Error(`YAHOO_CRUMB_HTTP_${crumbRes.status}`);
   const crumb = await crumbRes.text();
@@ -191,12 +202,12 @@ async function getCrumbSession(): Promise<CrumbSession> {
   return crumbSession;
 }
 
-export async function getAnalystTargets(symbol: string): Promise<AnalystTargets> {
+async function fetchAnalystTargetsLive(symbol: string): Promise<AnalystTargets> {
   const session = await getCrumbSession();
   const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=financialData&crumb=${encodeURIComponent(session.crumb)}`;
 
   let res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0", Cookie: session.cookie },
+    headers: { ...BROWSER_HEADERS, Cookie: session.cookie },
     cache: "no-store",
   });
 
@@ -206,7 +217,7 @@ export async function getAnalystTargets(symbol: string): Promise<AnalystTargets>
     const fresh = await getCrumbSession();
     res = await fetch(
       `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=financialData&crumb=${encodeURIComponent(fresh.crumb)}`,
-      { headers: { "User-Agent": "Mozilla/5.0", Cookie: fresh.cookie }, cache: "no-store" }
+      { headers: { ...BROWSER_HEADERS, Cookie: fresh.cookie }, cache: "no-store" }
     );
   }
 
@@ -223,6 +234,25 @@ export async function getAnalystTargets(symbol: string): Promise<AnalystTargets>
     recommendationKey: fd.recommendationKey ?? null,
     numberOfAnalysts: fd.numberOfAnalystOpinions?.raw ?? null,
   };
+}
+
+let targetsFreshCache: { data: AnalystTargets; expires: number } | null = null;
+// Kept indefinitely (no expiry) so a transient block on this flaky endpoint degrades to
+// "slightly stale" instead of "gone" — price targets don't move minute to minute anyway.
+let targetsLastKnownGood: AnalystTargets | null = null;
+
+export async function getAnalystTargets(symbol: string): Promise<AnalystTargets> {
+  if (targetsFreshCache && targetsFreshCache.expires > Date.now()) return targetsFreshCache.data;
+
+  try {
+    const fresh = await fetchAnalystTargetsLive(symbol);
+    targetsFreshCache = { data: fresh, expires: Date.now() + 6 * 60 * 60_000 };
+    targetsLastKnownGood = fresh;
+    return fresh;
+  } catch (err) {
+    if (targetsLastKnownGood) return targetsLastKnownGood;
+    throw err;
+  }
 }
 
 export async function getYahooCandles(
