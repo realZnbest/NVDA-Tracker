@@ -27,6 +27,7 @@ export interface FundamentalInputs {
 export interface AnalysisRead {
   technical: string[];
   fundamental: string[];
+  portfolio: string[] | null;
   verdict: "bullish" | "bearish" | "neutral" | "mixed";
   verdictText: string;
 }
@@ -184,9 +185,60 @@ export function buildFundamentalRead(input: FundamentalInputs): {
   return { lines, score };
 }
 
+export interface PortfolioInputs {
+  avgCost: number;
+  price: number;
+  unrealizedPnlPercent: number;
+  unrealizedPnl: number;
+}
+
+/**
+ * Purely observational — states the position's numbers and how they relate to the
+ * technical/fundamental read, never an instruction ("buy more" / "sell now"). The
+ * disclaimer in the panel is what keeps this from being read as advice.
+ */
+export function buildPortfolioRead(
+  portfolio: PortfolioInputs,
+  overallVerdict: AnalysisRead["verdict"]
+): string[] {
+  const lines: string[] = [];
+  const { avgCost, price, unrealizedPnlPercent, unrealizedPnl } = portfolio;
+  const pnlDirection = unrealizedPnlPercent >= 0 ? "กำไร" : "ขาดทุน";
+  const pnlAbsUsd = Math.abs(unrealizedPnl).toLocaleString("en-US", { maximumFractionDigits: 0 });
+
+  lines.push(
+    `คุณถือ NVDA ที่ต้นทุนเฉลี่ย $${avgCost.toFixed(2)} เทียบราคาปัจจุบัน $${price.toFixed(2)} ทำให้พอร์ต${pnlDirection}อยู่ ${Math.abs(unrealizedPnlPercent).toFixed(1)}% (${unrealizedPnl >= 0 ? "+" : "-"}$${pnlAbsUsd})`
+  );
+
+  if (Math.abs(unrealizedPnlPercent) < 3) {
+    lines.push(
+      `ราคาปัจจุบันอยู่ใกล้จุดคุ้มทุนของคุณมาก (ห่างแค่ ${Math.abs(unrealizedPnlPercent).toFixed(1)}%) ความเคลื่อนไหวระยะสั้นมีผลต่อสถานะกำไร/ขาดทุนได้ง่าย`
+    );
+  } else if (unrealizedPnlPercent >= 20) {
+    lines.push(`ราคาสูงกว่าต้นทุนเฉลี่ยของคุณไปมากแล้ว (+${unrealizedPnlPercent.toFixed(1)}%)`);
+  } else if (unrealizedPnlPercent <= -20) {
+    lines.push(`ราคาต่ำกว่าต้นทุนเฉลี่ยของคุณไปมาก (${unrealizedPnlPercent.toFixed(1)}%)`);
+  }
+
+  if (overallVerdict === "bullish" && unrealizedPnlPercent < 0) {
+    lines.push(
+      "สัญญาณเทคนิคและพื้นฐานโดยรวมตอนนี้เอนไปทางบวก ขณะที่พอร์ตของคุณยังขาดทุนอยู่ — เป็นจุดที่ควรติดตามอย่างใกล้ชิด"
+    );
+  } else if (overallVerdict === "bearish" && unrealizedPnlPercent > 0) {
+    lines.push(
+      "สัญญาณเทคนิคและพื้นฐานโดยรวมตอนนี้เอนไปทางลบ ขณะที่พอร์ตของคุณยังมีกำไรอยู่ — เป็นจุดที่ควรติดตามอย่างใกล้ชิด"
+    );
+  } else if (overallVerdict === "mixed") {
+    lines.push("สัญญาณเทคนิคและพื้นฐานให้น้ำหนักคนละทาง จึงควรพิจารณาสถานะพอร์ตของคุณประกอบอย่างรอบคอบ");
+  }
+
+  return lines;
+}
+
 export function synthesize(
   technical: TechnicalInputs,
-  fundamental: FundamentalInputs
+  fundamental: FundamentalInputs,
+  portfolio?: PortfolioInputs | null
 ): AnalysisRead {
   const tech = buildTechnicalRead(technical);
   const fund = buildFundamentalRead(fundamental);
@@ -210,5 +262,7 @@ export function synthesize(
     verdictText = "สัญญาณโดยรวมยังไม่ชี้ทิศทางชัดเจน เหมาะกับการรอความชัดเจนเพิ่มเติม";
   }
 
-  return { technical: tech.lines, fundamental: fund.lines, verdict, verdictText };
+  const portfolioLines = portfolio ? buildPortfolioRead(portfolio, verdict) : null;
+
+  return { technical: tech.lines, fundamental: fund.lines, portfolio: portfolioLines, verdict, verdictText };
 }

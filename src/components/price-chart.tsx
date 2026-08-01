@@ -27,6 +27,7 @@ import {
   sma,
 } from "@/lib/indicators";
 import type { FinnhubCandles } from "@/lib/finnhub";
+import type { Position } from "@/lib/position";
 
 const CH = {
   price: "#79b900",
@@ -69,6 +70,7 @@ export function PriceChart() {
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick" | "Line" | "Histogram">>>({});
   const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
   const srLinesRef = useRef<IPriceLine[]>([]);
+  const breakEvenLineRef = useRef<IPriceLine | null>(null);
 
   const [timeframe, setTimeframe] = useState<TimeframeKey>("1H");
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
@@ -84,6 +86,15 @@ export function PriceChart() {
   const [showMacd, setShowMacd] = useState(true);
   const [showSR, setShowSR] = useState(true);
   const [showStructure, setShowStructure] = useState(true);
+  const [showBreakEven, setShowBreakEven] = useState(true);
+  const [position, setPosition] = useState<Position | null>(null);
+
+  useEffect(() => {
+    fetch("/api/position")
+      .then((r) => r.json())
+      .then((data) => setPosition(data.position))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,6 +250,7 @@ export function PriceChart() {
       chartRef.current = null;
       markersPluginRef.current = null;
       srLinesRef.current = [];
+      breakEvenLineRef.current = null;
     };
   }, []);
 
@@ -317,6 +329,21 @@ export function PriceChart() {
       }
     }
 
+    if (breakEvenLineRef.current) {
+      s.candle.removePriceLine(breakEvenLineRef.current);
+      breakEvenLineRef.current = null;
+    }
+    if (showBreakEven && position) {
+      breakEvenLineRef.current = s.candle.createPriceLine({
+        price: position.avgCost,
+        color: "#e8ecf1",
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "ต้นทุนเฉลี่ยของฉัน",
+      });
+    }
+
     const markers: SeriesMarker<Time>[] = showStructure
       ? computed.structure.map((event) => ({
           time: event.time as UTCTimestamp,
@@ -339,6 +366,8 @@ export function PriceChart() {
     showMacd,
     showSR,
     showStructure,
+    showBreakEven,
+    position,
   ]);
 
   // Scope the default view to what the selected tab means (e.g. "1D" opens on the last
@@ -398,6 +427,14 @@ export function PriceChart() {
           <Toggle label="MACD" color={CH.macd} active={showMacd} onClick={() => setShowMacd((v) => !v)} />
           <Toggle label="แนวรับ/แนวต้าน" color="#9aa4b2" active={showSR} onClick={() => setShowSR((v) => !v)} />
           <Toggle label="BOS/CHoCH" color={CH.choch} active={showStructure} onClick={() => setShowStructure((v) => !v)} />
+          {position && (
+            <Toggle
+              label="ต้นทุนเฉลี่ย"
+              color="#e8ecf1"
+              active={showBreakEven}
+              onClick={() => setShowBreakEven((v) => !v)}
+            />
+          )}
         </div>
 
         <details className="ml-auto text-[11px] text-text-muted">

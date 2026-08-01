@@ -12,7 +12,11 @@ interface AlertsContextValue {
 
 const AlertsContext = createContext<AlertsContextValue | null>(null);
 
-const CHECK_INTERVAL_MS = 90_000;
+// Evaluation itself now runs on a server-side schedule (Render Cron Job hitting
+// /api/alerts/check independently of any visitor) — the client only needs to poll
+// for notifications the cron job may have already written, to keep the badge/bell
+// reasonably current while a tab is open.
+const REFRESH_INTERVAL_MS = 60_000;
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AlertNotification[]>([]);
@@ -30,25 +34,14 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const checkAlerts = useCallback(async () => {
-    try {
-      await fetch("/api/alerts/check", { method: "POST" });
-    } catch {
-      // silent
-    } finally {
-      fetchNotifications();
-    }
-  }, [fetchNotifications]);
-
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load on mount
     fetchNotifications();
-    checkAlerts();
-    timerRef.current = setInterval(checkAlerts, CHECK_INTERVAL_MS);
+    timerRef.current = setInterval(fetchNotifications, REFRESH_INTERVAL_MS);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [checkAlerts, fetchNotifications]);
+  }, [fetchNotifications]);
 
   const markRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? Date.now() })));

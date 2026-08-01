@@ -1,5 +1,6 @@
 import { ema, macd, rsi } from "./indicators";
 import { addNotification, listAlerts, markAlertTriggered } from "./alerts-store";
+import { computePositionMetrics, type Position } from "./position";
 import { ALERT_TYPE_LABEL_TH } from "./types";
 import type { Alert, AlertNotification } from "./types";
 
@@ -8,6 +9,7 @@ const COOLDOWN_MS = 12 * 60 * 60 * 1000;
 export interface MarketSnapshot {
   price: number;
   closes: number[];
+  position?: Position | null;
 }
 
 function fmt(n: number) {
@@ -18,7 +20,8 @@ export function evaluateAlerts(snapshot: MarketSnapshot): AlertNotification[] {
   const alerts = listAlerts().filter((a) => a.active);
   if (alerts.length === 0) return [];
 
-  const { price, closes } = snapshot;
+  const { price, closes, position } = snapshot;
+  const pnlPercent = position ? computePositionMetrics(position, price).unrealizedPnlPercent : null;
   const rsiSeries = rsi(closes, 14);
   const macdSeries = macd(closes);
   const ma50 = ema(closes, 50);
@@ -110,6 +113,16 @@ export function evaluateAlerts(snapshot: MarketSnapshot): AlertNotification[] {
           ma50Last < ma200Last
         ) {
           message = `เกิด Death Cross: MA50 ตัดลงใต้ MA200`;
+        }
+        break;
+      case "pnl_percent_above":
+        if (pnlPercent !== null && alert.threshold !== null && pnlPercent > alert.threshold) {
+          message = `พอร์ตของคุณกำไรถึง ${fmt(pnlPercent)}% แล้ว (ราคาปัจจุบัน ${fmt(price)})`;
+        }
+        break;
+      case "pnl_percent_below":
+        if (pnlPercent !== null && alert.threshold !== null && pnlPercent < alert.threshold) {
+          message = `พอร์ตของคุณขาดทุนถึง ${fmt(pnlPercent)}% แล้ว (ราคาปัจจุบัน ${fmt(price)})`;
         }
         break;
     }

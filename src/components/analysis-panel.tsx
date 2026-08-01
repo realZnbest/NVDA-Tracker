@@ -75,8 +75,27 @@ export function AnalysisPanel() {
             </ul>
           </div>
 
-          <p className="text-[10px] text-text-muted border-t border-seam pt-2">
-            บทวิเคราะห์นี้สร้างจากกฎที่ตั้งไว้ล่วงหน้า ไม่ใช่คำแนะนำการลงทุน โปรดใช้ประกอบการตัดสินใจของคุณเอง
+          {read.portfolio && (
+            <div>
+              <div className="telemetry text-[10px] mb-1.5" style={{ color: "#e8ecf1" }}>
+                มุมมองต่อพอร์ตของฉัน
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {read.portfolio.map((line, i) => (
+                  <li
+                    key={i}
+                    className="text-xs text-text-secondary leading-relaxed pl-3 relative before:content-['·'] before:absolute before:left-0 before:text-[#e8ecf1]"
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-[11px] text-ch-alert leading-relaxed rounded border border-ch-alert-dim bg-ch-alert-dim/20 px-3 py-2">
+            บทวิเคราะห์นี้สร้างจากกฎที่ตั้งไว้ล่วงหน้า{read.portfolio && "และอ้างอิงตำแหน่งของคุณ"}{" "}
+            ไม่ใช่คำแนะนำการลงทุน โปรดใช้ประกอบการตัดสินใจของคุณเองเท่านั้น
           </p>
         </div>
       )}
