@@ -1,0 +1,40 @@
+export type AlertType =
+  | "price_above"
+  | "price_below"
+  | "rsi_overbought"
+  | "rsi_oversold"
+  | "macd_bullish_cross"
+  | "macd_bearish_cross"
+  | "ma_golden_cross"
+  | "ma_death_cross";
+
+export interface Alert {
+  id: string;
+  type: AlertType;
+  label: string;
+  threshold: number | null;
+  fastPeriod: number | null;
+  slowPeriod: number | null;
+  active: boolean;
+  createdAt: number;
+  lastTriggeredAt: number | null;
+}
+
+export interface AlertNotification {
+  id: string;
+  alertId: string;
+  message: string;
+  createdAt: number;
+  readAt: number | null;
+}
+
+export const ALERT_TYPE_LABEL_TH: Record<AlertType, string> = {
+  price_above: "ราคาสูงกว่า",
+  price_below: "ราคาต่ำกว่า",
+  rsi_overbought: "RSI เข้าเขตซื้อมากเกิน (Overbought)",
+  rsi_oversold: "RSI เข้าเขตขายมากเกิน (Oversold)",
+  macd_bullish_cross: "MACD ตัดขึ้น (สัญญาณขาขึ้น)",
+  macd_bearish_cross: "MACD ตัดลง (สัญญาณขาลง)",
+  ma_golden_cross: "Golden Cross (MA เร็วตัดขึ้นเหนือ MA ช้า)",
+  ma_death_cross: "Death Cross (MA เร็วตัดลงใต้ MA ช้า)",
+};
