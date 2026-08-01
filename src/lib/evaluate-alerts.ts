@@ -14,8 +14,8 @@ function fmt(n: number) {
   return n.toLocaleString("th-TH", { maximumFractionDigits: 2 });
 }
 
-export function evaluateAlerts(snapshot: MarketSnapshot): AlertNotification[] {
-  const alerts = listAlerts().filter((a) => a.active);
+export async function evaluateAlerts(snapshot: MarketSnapshot): Promise<AlertNotification[]> {
+  const alerts = (await listAlerts()).filter((a) => a.active);
   if (alerts.length === 0) return [];
 
   const { price, closes } = snapshot;
@@ -115,8 +115,8 @@ export function evaluateAlerts(snapshot: MarketSnapshot): AlertNotification[] {
     }
 
     if (message) {
-      markAlertTriggered(alert.id);
-      fired.push(addNotification(alert.id, `[${ALERT_TYPE_LABEL_TH[alert.type]}] ${message}`));
+      await markAlertTriggered(alert.id);
+      fired.push(await addNotification(alert.id, `[${ALERT_TYPE_LABEL_TH[alert.type]}] ${message}`));
     }
   }
 

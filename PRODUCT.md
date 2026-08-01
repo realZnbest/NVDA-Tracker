@@ -8,10 +8,10 @@ web
 
 ## Stack
 
-Delegated: Next.js (App Router, TypeScript) + `lightweight-charts` (TradingView's open-source charting library) for the candlestick/volume/indicator panels, a small SQLite store (via `better-sqlite3`) for user-created alerts and watchlist state, and Next.js API routes as the Finnhub proxy/backend. Chosen because:
+Delegated: Next.js (App Router, TypeScript) + `lightweight-charts` (TradingView's open-source charting library) for the candlestick/volume/indicator panels, Turso (hosted SQLite-compatible, via `@libsql/client`) for user-created alerts, and Next.js API routes as the Finnhub proxy/backend. Chosen because:
 - **Next.js**: single codebase serves both the UI and the backend API routes needed to keep the Finnhub key server-side and to run alert-evaluation logic — and it deploys cleanly to Render.com later with no rewrite.
 - **lightweight-charts**: purpose-built for financial candlestick/volume data with native pan/zoom, crosshair, and multi-pane (price + RSI + MACD) support out of the box — this is what gives the "real trading terminal" feel the design bar requires, versus a generic charting library retrofitted with candlestick support.
-- **SQLite**: zero-ops persistence appropriate for a single-user tool; file-based, no separate DB service to run locally or on Render.
+- **Turso, not local SQLite**: Render's own filesystem is ephemeral (resets on every redeploy), so a local `better-sqlite3` file — the original choice — silently lost all alerts on each deploy. Supabase (Postgres) was tried first but the owner had already hit its free-tier project cap from prior unrelated projects; Turso has no such cap and, being SQLite-compatible, needed the smallest possible rewrite of the existing query logic.
 
 ## Users
 
@@ -40,9 +40,9 @@ Not a multi-ticker screener or portfolio tracker — a single-ticker deep tool, 
 - Financial statements page: income statement, balance sheet, cash flow — at minimum revenue, net income, EPS, margins, debt, free cash flow — with trend visualization across recent quarters/years, not tables alone, plus an AI-generated casual-Thai digest at the top.
 - Analyst consensus panel: Buy/Hold/Sell breakdown and a computed consensus badge from Finnhub's free recommendation-trends endpoint. A Yahoo price-target version was tried and removed — Yahoo's crumb-authenticated endpoint kept returning 429 from Render's IP regardless of headers/backoff/redirect fixes, so it was a dead end rather than a bug to keep patching; Finnhub-only is what's reliable in production.
 - Analysis tool: rule-based synthesis (no LLM call) that interprets current indicator readings (RSI overbought/oversold, MACD crossover, trend direction) and contextualizes fundamentals (growth trends, P/E, P/S vs historical average) into a plain-language read. Separate from the AI summary cards above, which do call an LLM (Gemini) specifically to digest financials/news into a short casual read.
-- Alerts: user-creatable threshold rules (price cross, RSI overbought/oversold, MACD crossover, MA golden/death cross), manageable (create/edit/delete) from one Alerts panel/page, surfaced via in-app notification panel + badge.
+- Alerts: user-creatable threshold rules (price cross, RSI overbought/oversold, MACD crossover, MA golden/death cross), manageable (create/edit/delete) from one Alerts panel/page, surfaced via in-app notification panel + badge, persisted in Turso so they survive a Render redeploy.
 - All user-facing copy (labels, nav, headings, tooltips, alerts, analysis text) must be natural Thai financial terminology. Code, comments, and identifiers stay in English.
-- Undecided: exact retained history window for cached candle data; whether Render.com deployment will need a paid tier for persistent disk (SQLite) — revisit at deploy time.
+- Undecided: exact retained history window for cached candle data.
 
 ## Evidence on Hand
 

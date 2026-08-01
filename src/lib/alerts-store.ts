@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { db } from "./db";
+import { getDb } from "./db";
 import type { Alert, AlertNotification, AlertType } from "./types";
 
 interface AlertRow {
@@ -18,21 +18,21 @@ function rowToAlert(row: AlertRow): Alert {
   return { ...row, active: row.active === 1 };
 }
 
-export function listAlerts(): Alert[] {
-  const rows = db
-    .prepare(`SELECT * FROM alerts ORDER BY createdAt DESC`)
-    .all() as AlertRow[];
-  return rows.map(rowToAlert);
+export async function listAlerts(): Promise<Alert[]> {
+  const db = await getDb();
+  const result = await db.execute(`SELECT * FROM alerts ORDER BY createdAt DESC`);
+  return (result.rows as unknown as AlertRow[]).map(rowToAlert);
 }
 
-export function createAlert(input: {
+export async function createAlert(input: {
   type: AlertType;
   label: string;
   threshold?: number | null;
   fastPeriod?: number | null;
   slowPeriod?: number | null;
-}): Alert {
-  const alert: AlertRow = {
+}): Promise<Alert> {
+  const db = await getDb();
+  const row: AlertRow = {
     id: randomUUID(),
     type: input.type,
     label: input.label,
@@ -43,20 +43,31 @@ export function createAlert(input: {
     createdAt: Date.now(),
     lastTriggeredAt: null,
   };
-  db.prepare(
-    `INSERT INTO alerts (id, type, label, threshold, fastPeriod, slowPeriod, active, createdAt, lastTriggeredAt)
-     VALUES (@id, @type, @label, @threshold, @fastPeriod, @slowPeriod, @active, @createdAt, @lastTriggeredAt)`
-  ).run(alert);
-  return rowToAlert(alert);
+  await db.execute({
+    sql: `INSERT INTO alerts (id, type, label, threshold, fastPeriod, slowPeriod, active, createdAt, lastTriggeredAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      row.id,
+      row.type,
+      row.label,
+      row.threshold,
+      row.fastPeriod,
+      row.slowPeriod,
+      row.active,
+      row.createdAt,
+      row.lastTriggeredAt,
+    ],
+  });
+  return rowToAlert(row);
 }
 
-export function updateAlert(
+export async function updateAlert(
   id: string,
   input: Partial<{ label: string; threshold: number | null; active: boolean }>
-): Alert | null {
-  const existing = db.prepare(`SELECT * FROM alerts WHERE id = ?`).get(id) as
-    | AlertRow
-    | undefined;
+): Promise<Alert | null> {
+  const db = await getDb();
+  const existingResult = await db.execute({ sql: `SELECT * FROM alerts WHERE id = ?`, args: [id] });
+  const existing = existingResult.rows[0] as unknown as AlertRow | undefined;
   if (!existing) return null;
 
   const next: AlertRow = {
@@ -65,25 +76,29 @@ export function updateAlert(
     threshold: input.threshold !== undefined ? input.threshold : existing.threshold,
     active: input.active !== undefined ? (input.active ? 1 : 0) : existing.active,
   };
-  db.prepare(
-    `UPDATE alerts SET label = @label, threshold = @threshold, active = @active WHERE id = @id`
-  ).run(next);
+  await db.execute({
+    sql: `UPDATE alerts SET label = ?, threshold = ?, active = ? WHERE id = ?`,
+    args: [next.label, next.threshold, next.active, id],
+  });
   return rowToAlert(next);
 }
 
-export function deleteAlert(id: string): void {
-  db.prepare(`DELETE FROM alerts WHERE id = ?`).run(id);
-  db.prepare(`DELETE FROM notifications WHERE alertId = ?`).run(id);
+export async function deleteAlert(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({ sql: `DELETE FROM alerts WHERE id = ?`, args: [id] });
+  await db.execute({ sql: `DELETE FROM notifications WHERE alertId = ?`, args: [id] });
 }
 
-export function markAlertTriggered(id: string): void {
-  db.prepare(`UPDATE alerts SET lastTriggeredAt = ? WHERE id = ?`).run(
-    Date.now(),
-    id
-  );
+export async function markAlertTriggered(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE alerts SET lastTriggeredAt = ? WHERE id = ?`,
+    args: [Date.now(), id],
+  });
 }
 
-export function addNotification(alertId: string, message: string): AlertNotification {
+export async function addNotification(alertId: string, message: string): Promise<AlertNotification> {
+  const db = await getDb();
   const note: AlertNotification = {
     id: randomUUID(),
     alertId,
@@ -91,21 +106,26 @@ export function addNotification(alertId: string, message: string): AlertNotifica
     createdAt: Date.now(),
     readAt: null,
   };
-  db.prepare(
-    `INSERT INTO notifications (id, alertId, message, createdAt, readAt)
-     VALUES (@id, @alertId, @message, @createdAt, @readAt)`
-  ).run(note);
+  await db.execute({
+    sql: `INSERT INTO notifications (id, alertId, message, createdAt, readAt) VALUES (?, ?, ?, ?, ?)`,
+    args: [note.id, note.alertId, note.message, note.createdAt, note.readAt],
+  });
   return note;
 }
 
-export function listNotifications(limit = 30): AlertNotification[] {
-  return db
-    .prepare(`SELECT * FROM notifications ORDER BY createdAt DESC LIMIT ?`)
-    .all(limit) as AlertNotification[];
+export async function listNotifications(limit = 30): Promise<AlertNotification[]> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT * FROM notifications ORDER BY createdAt DESC LIMIT ?`,
+    args: [limit],
+  });
+  return result.rows as unknown as AlertNotification[];
 }
 
-export function markNotificationsRead(): void {
-  db.prepare(`UPDATE notifications SET readAt = ? WHERE readAt IS NULL`).run(
-    Date.now()
-  );
+export async function markNotificationsRead(): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE notifications SET readAt = ? WHERE readAt IS NULL`,
+    args: [Date.now()],
+  });
 }

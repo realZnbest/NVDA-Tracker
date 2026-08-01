@@ -11,7 +11,7 @@ export async function PATCH(
     threshold: number | null;
     active: boolean;
   }>;
-  const alert = updateAlert(id, body);
+  const alert = await updateAlert(id, body);
   if (!alert) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
@@ -23,6 +23,6 @@ export async function DELETE(
   ctx: RouteContext<"/api/alerts/[id]">
 ) {
   const { id } = await ctx.params;
-  deleteAlert(id);
+  await deleteAlert(id);
   return NextResponse.json({ ok: true });
 }

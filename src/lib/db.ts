@@ -1,46 +1,54 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import { createClient, type Client } from "@libsql/client";
 
 declare global {
-  var __nvdaDb: Database.Database | undefined;
+  var __nvdaTurso: Client | undefined;
+  var __nvdaTursoInitialized: boolean | undefined;
 }
 
-function createDb() {
-  const dataDir = process.env.DATA_DIR ?? path.join(process.cwd(), "data");
-  fs.mkdirSync(dataDir, { recursive: true });
-  const dbPath = path.join(dataDir, "alerts.db");
-  const db = new Database(dbPath, { timeout: 5000 });
-  db.pragma("journal_mode = WAL");
-  db.pragma("busy_timeout = 5000");
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS alerts (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      label TEXT NOT NULL,
-      direction TEXT,
-      threshold REAL,
-      fastPeriod INTEGER,
-      slowPeriod INTEGER,
-      active INTEGER NOT NULL DEFAULT 1,
-      createdAt INTEGER NOT NULL,
-      lastTriggeredAt INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      alertId TEXT NOT NULL,
-      message TEXT NOT NULL,
-      createdAt INTEGER NOT NULL,
-      readAt INTEGER
-    );
-  `);
-
-  return db;
+function createTursoClient(): Client {
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+  if (!url) {
+    throw new Error("MISSING_TURSO_CONFIG");
+  }
+  return createClient({ url, authToken });
 }
 
-export const db = globalThis.__nvdaDb ?? createDb();
-if (process.env.NODE_ENV !== "production") {
-  globalThis.__nvdaDb = db;
+/**
+ * Lazily constructed on first real use, not at module load — Next.js evaluates route
+ * modules while collecting page data at build time, which would otherwise throw for
+ * missing env vars even on a machine that never actually serves a request. Tables are
+ * created here too (idempotent `CREATE TABLE IF NOT EXISTS`) so there's no separate
+ * manual migration step — unlike a hosted Postgres, a fresh Turso database starts empty.
+ */
+export async function getDb(): Promise<Client> {
+  if (!globalThis.__nvdaTurso) {
+    globalThis.__nvdaTurso = createTursoClient();
+  }
+  if (!globalThis.__nvdaTursoInitialized) {
+    await globalThis.__nvdaTurso.execute(`
+      CREATE TABLE IF NOT EXISTS alerts (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        label TEXT NOT NULL,
+        threshold REAL,
+        fastPeriod INTEGER,
+        slowPeriod INTEGER,
+        active INTEGER NOT NULL DEFAULT 1,
+        createdAt INTEGER NOT NULL,
+        lastTriggeredAt INTEGER
+      )
+    `);
+    await globalThis.__nvdaTurso.execute(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        alertId TEXT NOT NULL,
+        message TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        readAt INTEGER
+      )
+    `);
+    globalThis.__nvdaTursoInitialized = true;
+  }
+  return globalThis.__nvdaTurso;
 }

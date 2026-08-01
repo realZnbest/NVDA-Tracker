@@ -13,7 +13,7 @@ export async function POST() {
     if (candles.s !== "ok" || candles.c.length < 30) {
       return NextResponse.json({ fired: [] });
     }
-    const fired = evaluateAlerts({ price: quote.c, closes: candles.c });
+    const fired = await evaluateAlerts({ price: quote.c, closes: candles.c });
     return NextResponse.json({ fired });
   } catch (err) {
     if (err instanceof FinnhubError) {

@@ -3,7 +3,7 @@ import { createAlert, listAlerts } from "@/lib/alerts-store";
 import type { AlertType } from "@/lib/types";
 
 export async function GET() {
-  return NextResponse.json({ alerts: listAlerts() });
+  return NextResponse.json({ alerts: await listAlerts() });
 }
 
 export async function POST(request: NextRequest) {
@@ -19,6 +19,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const alert = createAlert(body);
+  const alert = await createAlert(body);
   return NextResponse.json({ alert }, { status: 201 });
 }
