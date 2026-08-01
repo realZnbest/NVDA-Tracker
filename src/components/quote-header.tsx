@@ -45,16 +45,18 @@ export function QuoteHeader() {
   const priceColor = up ? "var(--up)" : "var(--down)";
 
   return (
-    <div className="module flex flex-wrap items-end justify-between gap-4 px-5 py-4">
+    <div className="module relative flex flex-wrap items-end justify-between gap-4 px-5 py-4">
+      <div className="absolute right-3 top-3 sm:hidden">
+        <NotificationBell />
+      </div>
       <div>
-        <div className="flex items-center gap-2.5 mb-2">
-          <h1 className="text-xl font-semibold tracking-tight text-text-primary">
+        <div className="flex flex-wrap items-center gap-2.5 mb-2 pr-8 sm:pr-0">
+          <h1 className="text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">
             NVIDIA CORPORATION
           </h1>
           <span className="telemetry rounded px-2 py-0.5 text-[11px] bg-ch-price-dim text-ch-price">
             NASDAQ · NVDA
           </span>
-          <NotificationBell className="sm:hidden" />
         </div>
 
         {status === "ready" && quote ? (
