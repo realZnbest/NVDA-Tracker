@@ -254,6 +254,13 @@ export async function getAnalystTargets(symbol: string): Promise<AnalystTargets>
     return fresh;
   } catch (err) {
     if (targetsLastKnownGood) return targetsLastKnownGood;
+    // Enrich generic "fetch failed" errors (DNS/connection/TLS failures) with the
+    // underlying cause, which fetch buries in err.cause rather than the message.
+    if (err instanceof Error) {
+      const cause = (err as Error & { cause?: unknown }).cause;
+      const causeMsg = cause instanceof Error ? cause.message : cause ? String(cause) : null;
+      throw new Error(causeMsg ? `${err.message}: ${causeMsg}` : err.message);
+    }
     throw err;
   }
 }

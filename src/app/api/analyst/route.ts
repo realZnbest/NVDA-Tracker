@@ -23,5 +23,13 @@ export async function GET() {
   return NextResponse.json({
     trends: trends?.sort((a, b) => a.period.localeCompare(b.period)) ?? null,
     targets,
+    // Diagnostic only (not secret) — lets us see exactly why the Yahoo fetch failed
+    // without needing access to server logs.
+    targetsError:
+      targetsResult.status === "rejected"
+        ? targetsResult.reason instanceof Error
+          ? targetsResult.reason.message
+          : String(targetsResult.reason)
+        : null,
   });
 }

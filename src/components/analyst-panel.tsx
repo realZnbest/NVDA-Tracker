@@ -7,6 +7,7 @@ import type { AnalystTargets } from "@/lib/yahoo";
 interface AnalystResponse {
   trends: FinnhubRecommendationTrend[] | null;
   targets: AnalystTargets | null;
+  targetsError: string | null;
 }
 
 const RATING_LABEL_TH: Record<string, { label: string; color: string }> = {
@@ -60,9 +61,12 @@ export function AnalystPanel() {
           {data.targets ? (
             <PriceTargetRange targets={data.targets} price={price} />
           ) : (
-            <p className="text-xs text-text-muted">
-              ราคาเป้าหมายจาก Yahoo ดึงไม่สำเร็จตอนนี้ (อาจติดระบบกันบอทฝั่งเซิร์ฟเวอร์) ลองรีเฟรชอีกครั้งภายหลัง
-            </p>
+            <div className="text-xs text-text-muted">
+              <p>ราคาเป้าหมายจาก Yahoo ดึงไม่สำเร็จตอนนี้ (อาจติดระบบกันบอทฝั่งเซิร์ฟเวอร์) ลองรีเฟรชอีกครั้งภายหลัง</p>
+              {data.targetsError && (
+                <p className="telemetry text-[10px] mt-1 opacity-60">รายละเอียด: {data.targetsError}</p>
+              )}
+            </div>
           )}
           {data.trends && data.trends.length > 0 && (
             <RatingBreakdown trend={data.trends[data.trends.length - 1]} />
