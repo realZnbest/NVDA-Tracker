@@ -46,7 +46,7 @@ export function QuoteHeader() {
 
   return (
     <div className="module flex flex-wrap items-end justify-between gap-4 px-5 py-4">
-      <div>
+      <div className="w-full sm:w-auto">
         <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 mb-2">
           <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">
             NVIDIA CORPORATION
@@ -54,7 +54,7 @@ export function QuoteHeader() {
           <span className="telemetry rounded px-2 py-0.5 text-[11px] bg-ch-price-dim text-ch-price whitespace-nowrap">
             NASDAQ · NVDA
           </span>
-          <NotificationBell className="sm:hidden" />
+          <NotificationBell className="ml-auto sm:hidden" />
         </div>
 
         {status === "ready" && quote ? (
