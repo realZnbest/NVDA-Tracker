@@ -181,9 +181,12 @@ const BROWSER_HEADERS = {
 async function getCrumbSession(): Promise<CrumbSession> {
   if (crumbSession && crumbSession.expires > Date.now()) return crumbSession;
 
+  // Let the redirect chain follow normally rather than intercepting it manually — Set-Cookie
+  // visibility on a manually-intercepted redirect response is inconsistent across Node/undici
+  // versions (worked in local dev, silently returned no cookie in at least one deployed
+  // environment); a normal followed request reliably surfaces the cookie on the final response.
   const cookieRes = await fetch("https://fc.yahoo.com", {
     headers: BROWSER_HEADERS,
-    redirect: "manual",
   });
   const cookie = cookieRes.headers
     .getSetCookie()
