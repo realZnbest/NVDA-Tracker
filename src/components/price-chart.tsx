@@ -70,7 +70,7 @@ export function PriceChart() {
   const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
   const srLinesRef = useRef<IPriceLine[]>([]);
 
-  const [timeframe, setTimeframe] = useState<TimeframeKey>("1Y");
+  const [timeframe, setTimeframe] = useState<TimeframeKey>("1H");
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
   const [params, setParams] = useState<Params>(DEFAULT_PARAMS);
