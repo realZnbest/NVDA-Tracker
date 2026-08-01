@@ -15,7 +15,7 @@ import { bollinger, macd, rsi, sma } from "@/lib/indicators";
 import type { FinnhubCandles } from "@/lib/finnhub";
 
 const CH = {
-  price: "#e3a94b",
+  price: "#79b900",
   volume: "#3fc4d8",
   rsi: "#b28cf2",
   macd: "#2fd6a6",
@@ -147,7 +147,7 @@ export function PriceChart() {
     const rsiLower = chart.addSeries(LineSeries, { color: "rgba(52,209,124,0.4)", lineWidth: 1, priceLineVisible: false }, 2);
 
     const macdSeries = chart.addSeries(LineSeries, { color: CH.macd, lineWidth: 2, priceLineVisible: false }, 3);
-    const macdSignalSeries = chart.addSeries(LineSeries, { color: "#e3a94b", lineWidth: 1, priceLineVisible: false }, 3);
+    const macdSignalSeries = chart.addSeries(LineSeries, { color: "#d99a4e", lineWidth: 1, priceLineVisible: false }, 3);
     const macdHistSeries = chart.addSeries(HistogramSeries, { priceLineVisible: false }, 3);
 
     seriesRef.current = {

@@ -12,8 +12,8 @@ colors:
   text-primary: "#e8ecf1"
   text-secondary: "#9aa4b2"
   text-muted: "#5f6875"
-  ch-price: "#e3a94b"
-  ch-price-dim: "#6b5230"
+  ch-price: "#79b900"
+  ch-price-dim: "#34430c"
   ch-volume: "#3fc4d8"
   ch-volume-dim: "#23525a"
   ch-rsi: "#b28cf2"
@@ -78,7 +78,7 @@ NVDA Instrument Wall reads as a rack of live NVIDIA instrumentation, not a stock
 The system is unapologetically dense and instrument-grade: nothing is decorative, every color means a specific data channel, and every panel is a bounded "module" with its own silkscreen-style label, the way an actual rack unit is labeled. Thai-language copy carries the full UI (IBM Plex Sans Thai, chosen specifically for complete Thai glyph coverage paired natively with Latin), while every number that represents a live measurement renders in IBM Plex Mono, because tabular monospace numerals are what a real instrument readout uses — this is measurement typography, not a "technical" costume.
 
 **Key Characteristics:**
-- Near-black graphite ground, never pure black, with a faint top-of-screen amber glow implying a lit panel in a dark room.
+- Near-black graphite ground, never pure black, with a faint top-of-screen green glow implying a lit panel in a dark room.
 - One named accent color per data channel (price, volume, RSI, MACD, alerts), held constant across every chart, legend, toggle, and lamp that touches that channel.
 - Rack-panel "module" framing (hairline border + two corner rivets) is the one recurring container; there is no card-grid alternative container anywhere in the system.
 - Monospace telemetry is reserved for real numbers and instrument labels; Thai body copy never renders in mono.
@@ -88,7 +88,7 @@ The system is unapologetically dense and instrument-grade: nothing is decorative
 Ground colors sit within a few steps of near-black; every hue that appears above them is a named data channel, never decorative.
 
 ### Primary
-- **Instrument Amber** (`#e3a94b`, token `ch-price`): the price channel. Live quote digits, the price-pane MA20 line, the "PRICE" annunciator lamp, active timeframe pill. This is the one color present the moment the app opens.
+- **NVIDIA Green** (`#79b900`, token `ch-price`): the price channel. Live quote digits, the price-pane MA20 line, the "PRICE" annunciator lamp, active timeframe pill. This is the one color present the moment the app opens — chosen to match the brand green people already associate with NVIDIA, rather than a generic instrument amber.
 
 ### Secondary
 - **Console Cyan** (`#3fc4d8`, token `ch-volume`): the volume channel. Volume histogram bars (opacity modulated for up/down day, never re-hued), the "MA" annunciator lamp.

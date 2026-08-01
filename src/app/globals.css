@@ -16,8 +16,8 @@
   --text-muted: #5f6875;
 
   /* channel colors — each data channel keeps its color everywhere it appears */
-  --ch-price: #e3a94b;
-  --ch-price-dim: #6b5230;
+  --ch-price: #79b900;
+  --ch-price-dim: #34430c;
   --ch-volume: #3fc4d8;
   --ch-volume-dim: #23525a;
   --ch-rsi: #b28cf2;
@@ -77,7 +77,7 @@ body {
 body {
   background: var(--bg);
   background-image:
-    radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(227, 169, 75, 0.05), transparent),
+    radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(121, 185, 0, 0.06), transparent),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.012) 0px, rgba(255, 255, 255, 0.012) 1px, transparent 1px, transparent 3px);
   color: var(--text-primary);
   font-family: var(--font-thai), "Segoe UI", sans-serif;
