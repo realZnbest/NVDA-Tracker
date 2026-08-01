@@ -13,11 +13,11 @@ function consensusFromTrend(trend: FinnhubRecommendationTrend): { label: string;
   if (total === 0) return { label: "ไม่มีข้อมูล", color: "var(--text-muted)" };
   const score =
     (trend.strongBuy * 2 + trend.buy * 1 + trend.sell * -1 + trend.strongSell * -2) / total;
-  if (score >= 1.5) return { label: "ซื้อแรง", color: "var(--up)" };
+  if (score >= 1.5) return { label: "ซื้อทันที", color: "var(--up)" };
   if (score >= 0.5) return { label: "ซื้อ", color: "var(--up)" };
   if (score >= -0.5) return { label: "ถือ", color: "var(--ch-price)" };
   if (score >= -1.5) return { label: "ขาย", color: "var(--down)" };
-  return { label: "ขายแรง", color: "var(--down)" };
+  return { label: "ขายทันที", color: "var(--down)" };
 }
 
 export function AnalystPanel() {
@@ -60,11 +60,11 @@ export function AnalystPanel() {
 
 function RatingBreakdown({ trend }: { trend: FinnhubRecommendationTrend }) {
   const segments: { key: string; count: number; color: string; label: string }[] = [
-    { key: "strongBuy", count: trend.strongBuy, color: "var(--up)", label: "ซื้อแรง" },
+    { key: "strongBuy", count: trend.strongBuy, color: "var(--up)", label: "ซื้อทันที" },
     { key: "buy", count: trend.buy, color: "#7fd99a", label: "ซื้อ" },
     { key: "hold", count: trend.hold, color: "var(--text-muted)", label: "ถือ" },
     { key: "sell", count: trend.sell, color: "#e08a8a", label: "ขาย" },
-    { key: "strongSell", count: trend.strongSell, color: "var(--down)", label: "ขายแรง" },
+    { key: "strongSell", count: trend.strongSell, color: "var(--down)", label: "ขายทันที" },
   ];
   const total = segments.reduce((sum, s) => sum + s.count, 0);
   const consensus = consensusFromTrend(trend);
