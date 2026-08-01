@@ -268,7 +268,7 @@ export function PriceChart() {
         </div>
 
         <details className="ml-auto text-[11px] text-text-muted">
-          <summary className="cursor-pointer select-none hover:text-text-secondary">พารามิเตอร์</summary>
+          <summary className="cursor-pointer select-none hover:text-text-secondary">ตัวชี้วัด</summary>
           <div className="absolute right-4 mt-2 module p-3 flex flex-col gap-2 z-30">
             <ParamField label="MA เร็ว" value={params.ma1} onChange={(v) => setParams((p) => ({ ...p, ma1: v }))} />
             <ParamField label="MA กลาง" value={params.ma2} onChange={(v) => setParams((p) => ({ ...p, ma2: v }))} />

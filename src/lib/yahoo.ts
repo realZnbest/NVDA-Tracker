@@ -1,8 +1,26 @@
 import type { FinnhubCandles } from "./finnhub";
 
+interface YahooMeta {
+  regularMarketPrice: number;
+  previousClose?: number;
+  chartPreviousClose?: number;
+  preMarketPrice?: number;
+  preMarketChange?: number;
+  preMarketChangePercent?: number;
+  postMarketPrice?: number;
+  postMarketChange?: number;
+  postMarketChangePercent?: number;
+  currentTradingPeriod?: {
+    pre: { start: number; end: number };
+    regular: { start: number; end: number };
+    post: { start: number; end: number };
+  };
+}
+
 interface YahooChartResponse {
   chart: {
     result: Array<{
+      meta: YahooMeta;
       timestamp: number[];
       indicators: {
         quote: Array<{
@@ -18,8 +36,66 @@ interface YahooChartResponse {
   };
 }
 
+export type MarketSession = "pre" | "regular" | "post" | "closed";
+
+export interface ExtendedHoursQuote {
+  session: MarketSession;
+  pre: { price: number; change: number; changePercent: number } | null;
+  post: { price: number; change: number; changePercent: number } | null;
+}
+
 type CacheEntry = { expires: number; data: FinnhubCandles };
 const cache = new Map<string, CacheEntry>();
+
+type ExtCacheEntry = { expires: number; data: ExtendedHoursQuote };
+const extendedCache = new Map<string, ExtCacheEntry>();
+
+function computeSession(period: YahooMeta["currentTradingPeriod"]): MarketSession {
+  if (!period) return "closed";
+  const now = Date.now() / 1000;
+  if (now >= period.pre.start && now < period.pre.end) return "pre";
+  if (now >= period.regular.start && now < period.regular.end) return "regular";
+  if (now >= period.post.start && now < period.post.end) return "post";
+  return "closed";
+}
+
+export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHoursQuote> {
+  const hit = extendedCache.get(symbol);
+  if (hit && hit.expires > Date.now()) return hit.data;
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1m&includePrePost=true`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
+  const data = (await res.json()) as YahooChartResponse;
+  const meta = data.chart.result?.[0]?.meta;
+  if (!meta) throw new Error("YAHOO_NO_DATA");
+
+  const result: ExtendedHoursQuote = {
+    session: computeSession(meta.currentTradingPeriod),
+    pre:
+      meta.preMarketPrice !== undefined
+        ? {
+            price: meta.preMarketPrice,
+            change: meta.preMarketChange ?? 0,
+            changePercent: meta.preMarketChangePercent ?? 0,
+          }
+        : null,
+    post:
+      meta.postMarketPrice !== undefined
+        ? {
+            price: meta.postMarketPrice,
+            change: meta.postMarketChange ?? 0,
+            changePercent: meta.postMarketChangePercent ?? 0,
+          }
+        : null,
+  };
+
+  extendedCache.set(symbol, { expires: Date.now() + 15_000, data: result });
+  return result;
+}
 
 export async function getYahooCandles(
   symbol: string,
