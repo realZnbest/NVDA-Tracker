@@ -97,3 +97,14 @@ export function IconSpark({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconSliders({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 6h9M17 6h3M4 12h3M9 12h11M4 18h13M21 18h-1" />
+      <circle cx="13" cy="6" r="2" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="12" r="2" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="18" r="2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

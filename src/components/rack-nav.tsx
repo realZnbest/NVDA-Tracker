@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { IconBell, IconLedger, IconSignal, IconWave } from "./icons";
+import { IconBell, IconLedger, IconSignal, IconSliders, IconWave } from "./icons";
 import { useAlertsContext } from "./alerts-provider";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave },
   { href: "/financials", label: "งบการเงิน", icon: IconLedger },
   { href: "/news", label: "ข่าว", icon: IconSignal },
-  { href: "/alerts", label: "การแจ้งเตือน", icon: IconBell },
+  { href: "/alerts", label: "การแจ้งเตือน", icon: IconSliders },
 ] as const;
 
 export function RackNav() {
