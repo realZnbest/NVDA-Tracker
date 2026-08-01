@@ -47,8 +47,8 @@ export function QuoteHeader() {
   return (
     <div className="module flex flex-wrap items-end justify-between gap-4 px-5 py-4">
       <div>
-        <div className="flex flex-wrap items-center gap-2.5 mb-2">
-          <h1 className="text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">
+        <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 mb-2">
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">
             NVIDIA CORPORATION
           </h1>
           <NotificationBell className="sm:hidden" />
