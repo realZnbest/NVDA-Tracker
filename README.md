@@ -18,7 +18,24 @@ A personal NVIDIA (NVDA) analysis dashboard: candlestick price chart with RSI/MA
 
 ## Notes
 
-- Data provider is Finnhub's free tier (60 requests/min). Responses are cached briefly server-side to stay under that limit.
+- Data provider is Finnhub's free tier (quote, news, financials — 60 requests/min, cached server-side) plus Yahoo Finance's free chart endpoint (historical candles and pre/post-market prices; Finnhub's own candle endpoint is paid-only).
 - Alerts are stored locally in `data/alerts.db` (SQLite) and evaluated while the app is open, on a ~90s interval.
-- Deploying later (e.g. to Render.com): set `FINNHUB_API_KEY` as an environment variable there; nothing in the code assumes localhost. If the host's disk is ephemeral, `data/alerts.db` will reset on redeploy.
 - See `DESIGN.md` for the visual system and `PRODUCT.md` for product scope.
+
+## Deploying to Render.com
+
+1. **Push this repo to GitHub** (Render deploys from a git repo):
+   ```bash
+   git remote add origin <your-empty-github-repo-url>
+   git push -u origin main
+   ```
+2. On [render.com](https://render.com), **New → Web Service**, connect the GitHub repo.
+3. Settings:
+   - **Runtime:** Node
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start`
+4. **Environment variable:** add `FINNHUB_API_KEY` with your key (Environment tab).
+5. **Persistent disk** (so your alerts survive a redeploy): Render's free tier has an ephemeral filesystem — without a disk, `data/alerts.db` resets every time you deploy. Add one under **Disks**: mount path `/var/data`, then add an environment variable `DATA_DIR=/var/data`. (A disk requires a paid instance type; on the free tier, alerts will just reset on each deploy — everything else works fine.)
+6. Deploy. First build takes a few minutes (it compiles the SQLite native module).
+
+That's it — no code changes needed for any of this; the app already reads `FINNHUB_API_KEY` and `DATA_DIR` from the environment rather than assuming localhost.

@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import fs from "node:fs";
 import path from "node:path";
 
 declare global {
@@ -6,7 +7,9 @@ declare global {
 }
 
 function createDb() {
-  const dbPath = path.join(process.cwd(), "data", "alerts.db");
+  const dataDir = process.env.DATA_DIR ?? path.join(process.cwd(), "data");
+  fs.mkdirSync(dataDir, { recursive: true });
+  const dbPath = path.join(dataDir, "alerts.db");
   const db = new Database(dbPath, { timeout: 5000 });
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
