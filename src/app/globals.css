@@ -160,6 +160,38 @@ body {
   .lit {
     animation: lit-pulse 1.6s ease-in-out infinite;
   }
+
+  /* AI-generated content gets a galaxy gradient treatment so it reads as
+     distinct from live market data at a glance. */
+  .module-galaxy {
+    position: relative;
+    border-radius: 3px;
+    padding: 1px;
+    background: linear-gradient(135deg, #7c5cff, #b28cf2 30%, #3fc4d8 65%, #2fd6a6 100%);
+    background-size: 200% 200%;
+    animation: galaxy-drift 10s ease infinite;
+  }
+
+  .module-galaxy > .module {
+    border: none;
+    background:
+      radial-gradient(circle at 12% -10%, rgba(178, 140, 242, 0.18), transparent 55%),
+      radial-gradient(circle at 92% 115%, rgba(63, 196, 216, 0.16), transparent 55%),
+      radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.5), transparent),
+      radial-gradient(1px 1px at 75% 20%, rgba(255, 255, 255, 0.4), transparent),
+      radial-gradient(1px 1px at 60% 75%, rgba(255, 255, 255, 0.35), transparent),
+      radial-gradient(1px 1px at 35% 85%, rgba(255, 255, 255, 0.3), transparent),
+      var(--panel);
+  }
+
+  .module-galaxy-label {
+    background: linear-gradient(90deg, #b28cf2, #3fc4d8, #2fd6a6, #b28cf2);
+    background-size: 250% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: galaxy-drift 10s ease infinite;
+  }
 }
 
 @keyframes lit-pulse {
@@ -169,5 +201,15 @@ body {
   }
   50% {
     opacity: 0.55;
+  }
+}
+
+@keyframes galaxy-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
   }
 }
