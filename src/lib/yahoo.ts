@@ -59,6 +59,21 @@ function computeSession(period: YahooMeta["currentTradingPeriod"]): MarketSessio
   return "closed";
 }
 
+/** Last non-null close among bars whose timestamp falls within [start, end). */
+function lastCloseInWindow(
+  timestamps: number[],
+  closes: (number | null)[],
+  start: number,
+  end: number
+): number | null {
+  for (let i = timestamps.length - 1; i >= 0; i--) {
+    if (timestamps[i] >= start && timestamps[i] < end && closes[i] !== null) {
+      return closes[i];
+    }
+  }
+  return null;
+}
+
 export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHoursQuote> {
   const hit = extendedCache.get(symbol);
   if (hit && hit.expires > Date.now()) return hit.data;
@@ -70,28 +85,49 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
   });
   if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
   const data = (await res.json()) as YahooChartResponse;
-  const meta = data.chart.result?.[0]?.meta;
-  if (!meta) throw new Error("YAHOO_NO_DATA");
+  const chartResult = data.chart.result?.[0];
+  const meta = chartResult?.meta;
+  if (!meta || !chartResult) throw new Error("YAHOO_NO_DATA");
 
-  const result: ExtendedHoursQuote = {
-    session: computeSession(meta.currentTradingPeriod),
-    pre:
-      meta.preMarketPrice !== undefined
-        ? {
-            price: meta.preMarketPrice,
-            change: meta.preMarketChange ?? 0,
-            changePercent: meta.preMarketChangePercent ?? 0,
-          }
-        : null,
-    post:
-      meta.postMarketPrice !== undefined
-        ? {
-            price: meta.postMarketPrice,
-            change: meta.postMarketChange ?? 0,
-            changePercent: meta.postMarketChangePercent ?? 0,
-          }
-        : null,
-  };
+  const period = meta.currentTradingPeriod;
+  const timestamps = chartResult.timestamp;
+  const closes = chartResult.indicators.quote[0].close;
+  const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? null;
+  const regularPrice = meta.regularMarketPrice;
+
+  // Prefer Yahoo's live meta fields (only populated during the active session);
+  // once the window has passed, derive the last real print from the intraday bars instead.
+  let pre: ExtendedHoursQuote["pre"] = null;
+  if (meta.preMarketPrice !== undefined) {
+    pre = {
+      price: meta.preMarketPrice,
+      change: meta.preMarketChange ?? 0,
+      changePercent: meta.preMarketChangePercent ?? 0,
+    };
+  } else if (period && previousClose !== null) {
+    const price = lastCloseInWindow(timestamps, closes, period.pre.start, period.pre.end);
+    if (price !== null) {
+      const change = price - previousClose;
+      pre = { price, change, changePercent: (change / previousClose) * 100 };
+    }
+  }
+
+  let post: ExtendedHoursQuote["post"] = null;
+  if (meta.postMarketPrice !== undefined) {
+    post = {
+      price: meta.postMarketPrice,
+      change: meta.postMarketChange ?? 0,
+      changePercent: meta.postMarketChangePercent ?? 0,
+    };
+  } else if (period) {
+    const price = lastCloseInWindow(timestamps, closes, period.post.start, period.post.end);
+    if (price !== null) {
+      const change = price - regularPrice;
+      post = { price, change, changePercent: (change / regularPrice) * 100 };
+    }
+  }
+
+  const result: ExtendedHoursQuote = { session: computeSession(period), pre, post };
 
   extendedCache.set(symbol, { expires: Date.now() + 15_000, data: result });
   return result;
