@@ -20,7 +20,7 @@ A personal NVIDIA (NVDA) analysis dashboard: candlestick price chart with RSI/MA
 ## Notes
 
 - Data provider is Finnhub's free tier (quote, news, financials — 60 requests/min, cached server-side) plus Yahoo Finance's free chart endpoint (historical candles and pre/post-market prices; Finnhub's own candle endpoint is paid-only).
-- The AI summary cards call Google's Gemini API (`gemini-3.5-flash` by default, thinking disabled for speed) and are cached server-side for 1 hour per page. Without `GEMINI_API_KEY` set, those cards just show a "not configured" message — everything else in the app works fine without it.
+- The AI summary cards try a chain of providers in order — Gemini keys, then Groq keys, then OpenRouter keys, whichever are configured — falling through to the next one if a key hits its free-tier rate limit. Responses are cached server-side for 1 hour per page. Without any key set, those cards just show a "not configured" message — everything else in the app works fine without it.
 - Alerts are stored locally in `data/alerts.db` (SQLite) and evaluated while the app is open, on a ~90s interval.
 - See `DESIGN.md` for the visual system and `PRODUCT.md` for product scope.
 
@@ -36,7 +36,7 @@ A personal NVIDIA (NVDA) analysis dashboard: candlestick price chart with RSI/MA
    - **Runtime:** Node
    - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npm start`
-4. **Environment variables:** add `FINNHUB_API_KEY` with your key (Environment tab); optionally add `GEMINI_API_KEY` (and `GEMINI_MODEL` if you want a different model) for the AI summary cards.
+4. **Environment variables:** add `FINNHUB_API_KEY` with your key (Environment tab); optionally add any of the AI provider keys from `.env.local.example` for the AI summary cards — `GEMINI_API_KEY` alone is enough, the rest are just extra fallback quota.
 5. **Persistent disk** (so your alerts survive a redeploy): Render's free tier has an ephemeral filesystem — without a disk, `data/alerts.db` resets every time you deploy. Add one under **Disks**: mount path `/var/data`, then add an environment variable `DATA_DIR=/var/data`. (A disk requires a paid instance type; on the free tier, alerts will just reset on each deploy — everything else works fine.)
 6. Deploy. First build takes a few minutes (it compiles the SQLite native module).
 

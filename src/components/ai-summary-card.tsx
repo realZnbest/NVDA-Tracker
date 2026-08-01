@@ -15,7 +15,7 @@ export function AiSummaryCard({ type }: { type: "news" | "financials" }) {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        if (data.error === "MISSING_GEMINI_API_KEY") return setStatus("no_key");
+        if (data.error === "MISSING_AI_API_KEY") return setStatus("no_key");
         if (data.error === "NO_NEWS_DATA") return setStatus("no_data");
         if (data.error || !data.summary) return setStatus("error");
         setSummary(data.summary);
@@ -36,7 +36,7 @@ export function AiSummaryCard({ type }: { type: "news" | "financials" }) {
 
       {status === "loading" && <p className="text-sm text-text-muted">กำลังสรุปให้…</p>}
       {status === "no_key" && (
-        <p className="text-sm text-text-muted">ต้องตั้งค่า GEMINI_API_KEY ก่อนจึงจะสรุปด้วย AI ได้</p>
+        <p className="text-sm text-text-muted">ต้องตั้งค่า API key ของผู้ให้บริการ AI อย่างน้อย 1 เจ้าก่อนจึงจะสรุปด้วย AI ได้</p>
       )}
       {status === "no_data" && (
         <p className="text-sm text-text-muted">

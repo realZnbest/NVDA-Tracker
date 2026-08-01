@@ -6,7 +6,7 @@ import {
   FinnhubError,
 } from "@/lib/finnhub";
 import { extractAllQuarters } from "@/lib/financial-metrics";
-import { generateSummary, GeminiError } from "@/lib/gemini";
+import { generateSummary, AiError } from "@/lib/ai-provider";
 import { filterRelevantNews } from "@/lib/news-filter";
 import { SYMBOL } from "@/lib/timeframes";
 
@@ -59,7 +59,7 @@ async function buildNewsPrompt(): Promise<string> {
     .slice(0, 10);
 
   if (items.length === 0) {
-    throw new GeminiError("NO_NEWS_DATA");
+    throw new AiError("NO_NEWS_DATA");
   }
 
   const lines = items.map((n) => `- [${n.source}] ${n.headline}: ${n.summary}`);
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     cache.set(type, { expires: Date.now() + CACHE_TTL_MS, text: summary });
     return NextResponse.json({ summary });
   } catch (err) {
-    if (err instanceof GeminiError || err instanceof FinnhubError) {
+    if (err instanceof AiError || err instanceof FinnhubError) {
       return NextResponse.json({ error: err.message }, { status: 200 });
     }
     return NextResponse.json({ error: "UNKNOWN_ERROR" }, { status: 500 });
