@@ -3,7 +3,6 @@ import { IBM_Plex_Sans_Thai, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { RackNav } from "@/components/rack-nav";
 import { AlertsProvider } from "@/components/alerts-provider";
-import { EditSessionProvider } from "@/components/edit-session-provider";
 
 const plexThai = IBM_Plex_Sans_Thai({
   variable: "--font-plex-thai",
@@ -57,12 +56,10 @@ the verdict, and DESIGN.md.
 -->`,
           }}
         />
-        <EditSessionProvider>
-          <AlertsProvider>
-            <RackNav />
-            <main className="flex-1 min-w-0">{children}</main>
-          </AlertsProvider>
-        </EditSessionProvider>
+        <AlertsProvider>
+          <RackNav />
+          <main className="flex-1 min-w-0">{children}</main>
+        </AlertsProvider>
       </body>
     </html>
   );

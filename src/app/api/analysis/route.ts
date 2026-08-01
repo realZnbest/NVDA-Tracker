@@ -4,8 +4,6 @@ import { getYahooCandles } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 import { bollinger, ema, lastValid, macd, rsi, sma } from "@/lib/indicators";
 import { synthesize } from "@/lib/analysis";
-import { getPosition } from "@/lib/position-store";
-import { computePositionMetrics } from "@/lib/position";
 
 export async function GET() {
   try {
@@ -53,18 +51,7 @@ export async function GET() {
         week52High: m["52WeekHigh"] ?? null,
         week52Low: m["52WeekLow"] ?? null,
         price,
-      },
-      (() => {
-        const position = getPosition();
-        if (!position || position.shares <= 0) return null;
-        const metrics = computePositionMetrics(position, price);
-        return {
-          avgCost: position.avgCost,
-          price,
-          unrealizedPnlPercent: metrics.unrealizedPnlPercent,
-          unrealizedPnl: metrics.unrealizedPnl,
-        };
-      })()
+      }
     );
 
     return NextResponse.json({ read });

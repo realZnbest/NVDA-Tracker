@@ -35,27 +35,6 @@ function createDb() {
       createdAt INTEGER NOT NULL,
       readAt INTEGER
     );
-
-    CREATE TABLE IF NOT EXISTS position (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      avgCost REAL NOT NULL,
-      shares REAL NOT NULL,
-      startDate INTEGER NOT NULL,
-      updatedAt INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS magic_links (
-      token TEXT PRIMARY KEY,
-      createdAt INTEGER NOT NULL,
-      expiresAt INTEGER NOT NULL,
-      usedAt INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS edit_sessions (
-      token TEXT PRIMARY KEY,
-      createdAt INTEGER NOT NULL,
-      expiresAt INTEGER NOT NULL
-    );
   `);
 
   return db;

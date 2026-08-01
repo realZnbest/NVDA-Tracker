@@ -6,9 +6,7 @@ export type AlertType =
   | "macd_bullish_cross"
   | "macd_bearish_cross"
   | "ma_golden_cross"
-  | "ma_death_cross"
-  | "pnl_percent_above"
-  | "pnl_percent_below";
+  | "ma_death_cross";
 
 export interface Alert {
   id: string;
@@ -39,6 +37,4 @@ export const ALERT_TYPE_LABEL_TH: Record<AlertType, string> = {
   macd_bearish_cross: "MACD ตัดลง (สัญญาณขาลง)",
   ma_golden_cross: "Golden Cross (MA เร็วตัดขึ้นเหนือ MA ช้า)",
   ma_death_cross: "Death Cross (MA เร็วตัดลงใต้ MA ช้า)",
-  pnl_percent_above: "พอร์ตกำไรถึง (%)",
-  pnl_percent_below: "พอร์ตขาดทุนถึง (%)",
 };

@@ -3,15 +3,8 @@
 import { useEffect, useState } from "react";
 import { ALERT_TYPE_LABEL_TH, type Alert, type AlertType } from "@/lib/types";
 import { IconPlus, IconTrash } from "./icons";
-import { useEditSession } from "./edit-session-provider";
-import { RequestEditAccess } from "./request-edit-access";
 
-const TYPES_WITH_THRESHOLD: AlertType[] = [
-  "price_above",
-  "price_below",
-  "pnl_percent_above",
-  "pnl_percent_below",
-];
+const TYPES_WITH_THRESHOLD: AlertType[] = ["price_above", "price_below"];
 const TYPES_WITH_OPTIONAL_THRESHOLD: AlertType[] = ["rsi_overbought", "rsi_oversold"];
 
 const DEFAULT_THRESHOLD: Partial<Record<AlertType, number>> = {
@@ -19,14 +12,7 @@ const DEFAULT_THRESHOLD: Partial<Record<AlertType, number>> = {
   rsi_oversold: 30,
 };
 
-function thresholdLabel(type: AlertType): string {
-  if (type.startsWith("price")) return "ราคาเป้าหมาย ($)";
-  if (type.startsWith("pnl_percent")) return "กำไร/ขาดทุน (%)";
-  return "เกณฑ์ (ค่าเริ่มต้นถ้าเว้นว่าง)";
-}
-
 export function AlertsManager() {
-  const { canEdit, loaded } = useEditSession();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -83,59 +69,50 @@ export function AlertsManager() {
 
   return (
     <div className="flex flex-col gap-4">
-      {loaded && !canEdit && (
-        <div className="module p-4">
-          <p className="text-sm text-text-muted mb-2">
-            ดูรายการแจ้งเตือนได้ตามปกติ แต่ต้องเข้าสู่โหมดแก้ไขก่อนจึงจะเพิ่ม/แก้ไข/ลบได้
-          </p>
-          <RequestEditAccess />
-        </div>
-      )}
-
-      {canEdit && (
-        <form onSubmit={handleCreate} className="module p-4 flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="module-label">ประเภทการแจ้งเตือน</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as AlertType)}
-              className="telemetry rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
-            >
-              {(Object.keys(ALERT_TYPE_LABEL_TH) as AlertType[]).map((t) => (
-                <option key={t} value={t}>
-                  {ALERT_TYPE_LABEL_TH[t]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {(needsThreshold || optionalThreshold) && (
-            <div className="flex flex-col gap-1.5">
-              <label className="module-label">{thresholdLabel(type)}</label>
-              <input
-                type="number"
-                step="0.01"
-                value={threshold}
-                onChange={(e) => setThreshold(e.target.value)}
-                placeholder={
-                  optionalThreshold ? String(DEFAULT_THRESHOLD[type] ?? "") : "เช่น 150.00"
-                }
-                className="telemetry w-36 rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
-                required={needsThreshold}
-              />
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="flex items-center gap-1.5 rounded bg-ch-price-dim px-3 py-1.5 text-sm text-ch-price hover:brightness-125 transition-[filter] disabled:opacity-50"
+      <form onSubmit={handleCreate} className="module p-4 flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label className="module-label">ประเภทการแจ้งเตือน</label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as AlertType)}
+            className="telemetry rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
           >
-            <IconPlus className="h-3.5 w-3.5" />
-            เพิ่มการแจ้งเตือน
-          </button>
-        </form>
-      )}
+            {(Object.keys(ALERT_TYPE_LABEL_TH) as AlertType[]).map((t) => (
+              <option key={t} value={t}>
+                {ALERT_TYPE_LABEL_TH[t]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(needsThreshold || optionalThreshold) && (
+          <div className="flex flex-col gap-1.5">
+            <label className="module-label">
+              {type.startsWith("price") ? "ราคาเป้าหมาย ($)" : "เกณฑ์ (ค่าเริ่มต้นถ้าเว้นว่าง)"}
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={threshold}
+              onChange={(e) => setThreshold(e.target.value)}
+              placeholder={
+                optionalThreshold ? String(DEFAULT_THRESHOLD[type] ?? "") : "เช่น 150.00"
+              }
+              className="telemetry w-36 rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
+              required={needsThreshold}
+            />
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex items-center gap-1.5 rounded bg-ch-price-dim px-3 py-1.5 text-sm text-ch-price hover:brightness-125 transition-[filter] disabled:opacity-50"
+        >
+          <IconPlus className="h-3.5 w-3.5" />
+          เพิ่มการแจ้งเตือน
+        </button>
+      </form>
 
       <div className="module">
         <div className="module-label px-4 py-3 border-b border-seam">
@@ -174,25 +151,23 @@ export function AlertsManager() {
                     </p>
                   </div>
                 </div>
-                {canEdit && (
-                  <div className="flex items-center gap-3 shrink-0">
-                    <button
-                      onClick={() => handleToggle(a)}
-                      className={`telemetry text-[11px] rounded px-2 py-1 ${
-                        a.active ? "text-up bg-up/10" : "text-text-muted bg-white/5"
-                      }`}
-                    >
-                      {a.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(a.id)}
-                      className="text-text-muted hover:text-ch-alert transition-colors"
-                      aria-label="ลบ"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => handleToggle(a)}
+                    className={`telemetry text-[11px] rounded px-2 py-1 ${
+                      a.active ? "text-up bg-up/10" : "text-text-muted bg-white/5"
+                    }`}
+                  >
+                    {a.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(a.id)}
+                    className="text-text-muted hover:text-ch-alert transition-colors"
+                    aria-label="ลบ"
+                  >
+                    <IconTrash className="h-4 w-4" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
