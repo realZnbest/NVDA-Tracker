@@ -243,25 +243,39 @@ let targetsFreshCache: { data: AnalystTargets; expires: number } | null = null;
 // Kept indefinitely (no expiry) so a transient block on this flaky endpoint degrades to
 // "slightly stale" instead of "gone" — price targets don't move minute to minute anyway.
 let targetsLastKnownGood: AnalystTargets | null = null;
+// A 429 means Yahoo is already rate-limiting this IP — retrying on every page load only
+// hammers it further and delays recovery. Back off for a while after any failure instead
+// of trying again on the very next request.
+let lastFailure: { message: string; until: number } | null = null;
+const FAILURE_COOLDOWN_MS = 30 * 60_000;
 
 export async function getAnalystTargets(symbol: string): Promise<AnalystTargets> {
   if (targetsFreshCache && targetsFreshCache.expires > Date.now()) return targetsFreshCache.data;
+
+  if (lastFailure && lastFailure.until > Date.now()) {
+    if (targetsLastKnownGood) return targetsLastKnownGood;
+    throw new Error(`${lastFailure.message} (backing off retries for a while)`);
+  }
 
   try {
     const fresh = await fetchAnalystTargetsLive(symbol);
     targetsFreshCache = { data: fresh, expires: Date.now() + 6 * 60 * 60_000 };
     targetsLastKnownGood = fresh;
+    lastFailure = null;
     return fresh;
   } catch (err) {
-    if (targetsLastKnownGood) return targetsLastKnownGood;
     // Enrich generic "fetch failed" errors (DNS/connection/TLS failures) with the
     // underlying cause, which fetch buries in err.cause rather than the message.
+    let message = err instanceof Error ? err.message : String(err);
     if (err instanceof Error) {
       const cause = (err as Error & { cause?: unknown }).cause;
       const causeMsg = cause instanceof Error ? cause.message : cause ? String(cause) : null;
-      throw new Error(causeMsg ? `${err.message}: ${causeMsg}` : err.message);
+      if (causeMsg) message = `${message}: ${causeMsg}`;
     }
-    throw err;
+    lastFailure = { message, until: Date.now() + FAILURE_COOLDOWN_MS };
+
+    if (targetsLastKnownGood) return targetsLastKnownGood;
+    throw new Error(message);
   }
 }
 
