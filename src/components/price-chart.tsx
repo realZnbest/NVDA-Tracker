@@ -114,8 +114,29 @@ export function PriceChart() {
     if (!candles) return null;
     const closes = candles.c;
     const rsiSeries = rsi(closes, params.rsiPeriod);
-    const pivots = findPivots(candles.t, candles.h, candles.l, params.swingBars, params.swingBars);
     const lastClose = closes[closes.length - 1];
+
+    // Support/resistance and BOS/CHoCH are only meaningful over recent price action —
+    // the candle fetch itself can span decades (so zooming out reveals real history),
+    // but a "support" level from NVDA's 1999 IPO price is just noise today. Scope
+    // structure detection to a multiple of the selected tab's own window instead.
+    const tf = TIMEFRAMES.find((t) => t.key === timeframe);
+    const lastTime = candles.t[candles.t.length - 1];
+    const scopeDaysNum =
+      tf?.scopeDays === "ytd"
+        ? (lastTime - Date.UTC(new Date(lastTime * 1000).getUTCFullYear(), 0, 1) / 1000) / 86400
+        : tf?.scopeDays ?? 365;
+    const windowStart = lastTime - Math.max(scopeDaysNum * 4, 30) * 24 * 60 * 60;
+    let startIndex = candles.t.findIndex((t) => t >= windowStart);
+    if (startIndex === -1) startIndex = 0;
+
+    const wt = candles.t.slice(startIndex);
+    const wh = candles.h.slice(startIndex);
+    const wl = candles.l.slice(startIndex);
+    const wc = closes.slice(startIndex);
+
+    const pivots = findPivots(wt, wh, wl, params.swingBars, params.swingBars);
+
     return {
       ma1: sma(closes, params.ma1),
       ma2: sma(closes, params.ma2),
@@ -125,16 +146,9 @@ export function PriceChart() {
       rsiMa: movingAverageOf(rsiSeries, params.rsiMaPeriod),
       macd: macd(closes),
       sr: computeSupportResistance(pivots, lastClose),
-      structure: detectStructureBreaks(
-        candles.t,
-        candles.h,
-        candles.l,
-        closes,
-        params.swingBars,
-        params.swingBars
-      ),
+      structure: detectStructureBreaks(wt, wh, wl, wc, params.swingBars, params.swingBars),
     };
-  }, [candles, params]);
+  }, [candles, params, timeframe]);
 
   // create chart once
   useEffect(() => {
@@ -313,8 +327,6 @@ export function PriceChart() {
         }))
       : [];
     markersPluginRef.current?.setMarkers(markers);
-
-    chartRef.current.timeScale().fitContent();
   }, [
     candles,
     computed,
@@ -328,6 +340,32 @@ export function PriceChart() {
     showSR,
     showStructure,
   ]);
+
+  // Scope the default view to what the selected tab means (e.g. "1D" opens on the last
+  // day) without discarding the rest of the fetched history — zooming/panning out still
+  // reveals everything the fetch above pulled in, all the way back to IPO where available.
+  useEffect(() => {
+    if (!candles || !chartRef.current) return;
+    const times = candles.t;
+    if (times.length === 0) return;
+
+    const tf = TIMEFRAMES.find((t) => t.key === timeframe);
+    const lastTime = times[times.length - 1];
+    let fromTime: number;
+    if (tf?.scopeDays === "ytd") {
+      const lastDate = new Date(lastTime * 1000);
+      fromTime = Date.UTC(lastDate.getUTCFullYear(), 0, 1) / 1000;
+    } else if (tf) {
+      fromTime = lastTime - tf.scopeDays * 24 * 60 * 60;
+    } else {
+      fromTime = times[0];
+    }
+
+    chartRef.current.timeScale().setVisibleRange({
+      from: Math.max(fromTime, times[0]) as UTCTimestamp,
+      to: lastTime as UTCTimestamp,
+    });
+  }, [candles, timeframe]);
 
   const panesVisible = 2 + (showRsi ? 1 : 0) + (showMacd ? 1 : 0);
 
