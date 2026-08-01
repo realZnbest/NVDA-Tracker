@@ -99,18 +99,8 @@ export function getQuote(symbol: string) {
   return fetchFinnhub<FinnhubQuote>("/quote", { symbol }, 15_000);
 }
 
-export function getCandles(
-  symbol: string,
-  resolution: string,
-  from: number,
-  to: number
-) {
-  return fetchFinnhub<FinnhubCandles>(
-    "/stock/candle",
-    { symbol, resolution, from, to },
-    60_000
-  );
-}
+// Note: Finnhub's /stock/candle endpoint is restricted to paid plans.
+// Historical price candles come from Yahoo Finance instead — see lib/yahoo.ts.
 
 export function getCompanyNews(symbol: string, from: string, to: string) {
   return fetchFinnhub<FinnhubNewsItem[]>(

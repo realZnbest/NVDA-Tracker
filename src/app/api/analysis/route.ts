@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { getBasicFinancials, getCandles, getQuote, FinnhubError } from "@/lib/finnhub";
+import { getBasicFinancials, getQuote, FinnhubError } from "@/lib/finnhub";
+import { getYahooCandles } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 import { bollinger, ema, lastValid, macd, rsi, sma } from "@/lib/indicators";
 import { synthesize } from "@/lib/analysis";
 
 export async function GET() {
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - 400 * 24 * 60 * 60;
-
   try {
     const [candles, quote, financials] = await Promise.all([
-      getCandles(SYMBOL, "D", from, to),
+      getYahooCandles(SYMBOL, "2y", "1d"),
       getQuote(SYMBOL),
       getBasicFinancials(SYMBOL),
     ]);

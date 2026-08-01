@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { getCandles, getQuote, FinnhubError } from "@/lib/finnhub";
+import { getQuote, FinnhubError } from "@/lib/finnhub";
+import { getYahooCandles } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 import { evaluateAlerts } from "@/lib/evaluate-alerts";
 
 export async function POST() {
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - 400 * 24 * 60 * 60;
-
   try {
     const [candles, quote] = await Promise.all([
-      getCandles(SYMBOL, "D", from, to),
+      getYahooCandles(SYMBOL, "2y", "1d"),
       getQuote(SYMBOL),
     ]);
     if (candles.s !== "ok" || candles.c.length < 30) {
