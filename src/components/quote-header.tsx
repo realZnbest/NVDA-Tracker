@@ -51,10 +51,10 @@ export function QuoteHeader() {
           <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">
             NVIDIA CORPORATION
           </h1>
-          <NotificationBell className="sm:hidden" />
           <span className="telemetry rounded px-2 py-0.5 text-[11px] bg-ch-price-dim text-ch-price whitespace-nowrap">
             NASDAQ · NVDA
           </span>
+          <NotificationBell className="sm:hidden" />
         </div>
 
         {status === "ready" && quote ? (
