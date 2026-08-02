@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ALERT_TYPE_LABEL_TH, type Alert, type AlertType } from "@/lib/types";
 import { IconPlus, IconTrash } from "./icons";
+import { useAlertsContext } from "./alerts-provider";
+import { AlertsPasswordGate } from "./alerts-password-gate";
 
 const TYPES_WITH_THRESHOLD: AlertType[] = ["price_above", "price_below"];
 const TYPES_WITH_OPTIONAL_THRESHOLD: AlertType[] = ["rsi_overbought", "rsi_oversold"];
@@ -13,6 +15,7 @@ const DEFAULT_THRESHOLD: Partial<Record<AlertType, number>> = {
 };
 
 export function AlertsManager() {
+  const { authStatus, logout } = useAlertsContext();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,8 +30,24 @@ export function AlertsManager() {
       .finally(() => setLoading(false));
 
   useEffect(() => {
-    refresh();
-  }, []);
+    if (authStatus === "authenticated") refresh();
+  }, [authStatus]);
+
+  if (authStatus === "checking") {
+    return <p className="text-sm text-text-muted">กำลังตรวจสอบสิทธิ์…</p>;
+  }
+
+  if (authStatus === "not_configured") {
+    return (
+      <p className="text-sm text-text-muted">
+        ยังไม่ได้ตั้งค่า ALERTS_PASSWORD บนเซิร์ฟเวอร์ — เพิ่มตัวแปรนี้ก่อนจึงจะใช้การแจ้งเตือนได้
+      </p>
+    );
+  }
+
+  if (authStatus !== "authenticated") {
+    return <AlertsPasswordGate />;
+  }
 
   const needsThreshold = TYPES_WITH_THRESHOLD.includes(type);
   const optionalThreshold = TYPES_WITH_OPTIONAL_THRESHOLD.includes(type);
@@ -115,8 +134,14 @@ export function AlertsManager() {
       </form>
 
       <div className="module">
-        <div className="module-label px-4 py-3 border-b border-seam">
-          รายการที่ตั้งไว้ ({alerts.length})
+        <div className="flex items-center justify-between px-4 py-3 border-b border-seam">
+          <span className="module-label">รายการที่ตั้งไว้ ({alerts.length})</span>
+          <button
+            onClick={() => logout()}
+            className="text-[11px] text-text-muted hover:text-text-primary transition-colors"
+          >
+            ออกจากระบบ
+          </button>
         </div>
         {loading ? (
           <p className="text-sm text-text-muted px-4 py-6">กำลังโหลด…</p>

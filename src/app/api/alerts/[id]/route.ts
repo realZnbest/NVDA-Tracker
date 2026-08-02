@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteAlert, updateAlert } from "@/lib/alerts-store";
+import { requireAlertsAuth } from "@/lib/alerts-auth";
 
 export async function PATCH(
   request: NextRequest,
   ctx: RouteContext<"/api/alerts/[id]">
 ) {
+  const unauth = await requireAlertsAuth();
+  if (unauth) return unauth;
   const { id } = await ctx.params;
   const body = (await request.json()) as Partial<{
     label: string;
@@ -22,6 +25,8 @@ export async function DELETE(
   _request: NextRequest,
   ctx: RouteContext<"/api/alerts/[id]">
 ) {
+  const unauth = await requireAlertsAuth();
+  if (unauth) return unauth;
   const { id } = await ctx.params;
   await deleteAlert(id);
   return NextResponse.json({ ok: true });

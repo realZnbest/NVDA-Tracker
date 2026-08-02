@@ -3,8 +3,11 @@ import { getQuote, FinnhubError } from "@/lib/finnhub";
 import { getYahooCandles } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 import { evaluateAlerts } from "@/lib/evaluate-alerts";
+import { requireAlertsAuth } from "@/lib/alerts-auth";
 
 export async function POST() {
+  const unauth = await requireAlertsAuth();
+  if (unauth) return unauth;
   try {
     const [candles, quote] = await Promise.all([
       getYahooCandles(SYMBOL, "2y", "1d"),
