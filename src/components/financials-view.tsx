@@ -8,11 +8,11 @@ import type { FinnhubReportedFinancials } from "@/lib/finnhub";
 type Metrics = Record<string, number | undefined>;
 
 const fmtUsd = (v: number) => {
-  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  return `$${v.toFixed(0)}`;
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+  return `$${v.toFixed(2)}`;
 };
-const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+const fmtPct = (v: number) => `${v.toFixed(2)}%`;
 const fmtEps = (v: number) => `$${v.toFixed(2)}`;
 
 export function FinancialsView() {
@@ -115,7 +115,7 @@ function RatioCard({ label, value, suffix }: { label: string; value?: number; su
     <div className="module p-3">
       <div className="module-label mb-1.5">{label}</div>
       <div className="telemetry text-xl text-text-primary">
-        {value !== undefined && value !== null ? value.toFixed(1) : "—"}
+        {value !== undefined && value !== null ? value.toFixed(2) : "—"}
         <span className="text-xs text-text-muted ml-1">{suffix}</span>
       </div>
     </div>

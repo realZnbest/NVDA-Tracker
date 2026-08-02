@@ -31,9 +31,9 @@ function isoDate(d: Date) {
 
 function fmtUsd(v: number | null) {
   if (v === null) return "ไม่มีข้อมูล";
-  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  return `$${v.toFixed(0)}`;
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+  return `$${v.toFixed(2)}`;
 }
 
 async function buildChatContext(): Promise<string> {
@@ -83,7 +83,7 @@ async function buildChatContext(): Promise<string> {
         `ผลประกอบการล่าสุด:\n${quarters
           .map(
             (q) =>
-              `- ${q.periodLabel}: รายได้ ${fmtUsd(q.revenue)}, กำไรสุทธิ ${fmtUsd(q.netIncome)}, อัตรากำไรสุทธิ ${q.netMargin?.toFixed(1) ?? "ไม่มีข้อมูล"}%`
+              `- ${q.periodLabel}: รายได้ ${fmtUsd(q.revenue)}, กำไรสุทธิ ${fmtUsd(q.netIncome)}, อัตรากำไรสุทธิ ${q.netMargin?.toFixed(2) ?? "ไม่มีข้อมูล"}%`
           )
           .join("\n")}`
       );

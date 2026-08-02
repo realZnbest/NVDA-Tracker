@@ -39,7 +39,7 @@ export interface AnalysisRead {
 }
 
 function pct(n: number) {
-  return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+  return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
 
 export function buildTechnicalRead(
@@ -55,26 +55,26 @@ export function buildTechnicalRead(
   if (input.rsi !== null) {
     if (input.rsi >= 70) {
       lines.push(
-        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เข้าเขตซื้อมากเกิน (Overbought) — โมเมนตัมแข็งแกร่งแต่เสี่ยงพักตัวระยะสั้น`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(2)} เข้าเขตซื้อมากเกิน (Overbought) — โมเมนตัมแข็งแกร่งแต่เสี่ยงพักตัวระยะสั้น`
       );
       score -= 1;
     } else if (input.rsi <= 30) {
       lines.push(
-        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เข้าเขตขายมากเกิน (Oversold) — แรงขายอาจเริ่มอ่อนแรงลง`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(2)} เข้าเขตขายมากเกิน (Oversold) — แรงขายอาจเริ่มอ่อนแรงลง`
       );
       score += 1;
     } else if (input.rsi >= 55) {
       lines.push(
-        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เอนไปทางฝั่งซื้อ สะท้อนแนวโน้มขาขึ้นที่ยังไม่ตึงตัวเกินไป`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(2)} เอนไปทางฝั่งซื้อ สะท้อนแนวโน้มขาขึ้นที่ยังไม่ตึงตัวเกินไป`
       );
       score += 0.5;
     } else if (input.rsi <= 45) {
       lines.push(
-        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เอนไปทางฝั่งขาย สะท้อนแรงกดดันขาลงที่ยังไม่ถึงจุดสุดขั้ว`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(2)} เอนไปทางฝั่งขาย สะท้อนแรงกดดันขาลงที่ยังไม่ถึงจุดสุดขั้ว`
       );
       score -= 0.5;
     } else {
-      lines.push(`RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} อยู่ในโซนกลาง ยังไม่ชี้ทิศทางชัดเจน`);
+      lines.push(`RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(2)} อยู่ในโซนกลาง ยังไม่ชี้ทิศทางชัดเจน`);
     }
   }
 
@@ -157,26 +157,26 @@ export function buildFundamentalRead(input: FundamentalInputs): {
 
   if (input.netMarginTTM !== null) {
     if (input.netMarginTTM > 30) {
-      lines.push(`อัตรากำไรสุทธิ ${input.netMarginTTM.toFixed(1)}% สูงมาก สะท้อนความสามารถในการทำกำไรที่แข็งแกร่ง`);
+      lines.push(`อัตรากำไรสุทธิ ${input.netMarginTTM.toFixed(2)}% สูงมาก สะท้อนความสามารถในการทำกำไรที่แข็งแกร่ง`);
       score += 1;
     } else if (input.netMarginTTM > 15) {
-      lines.push(`อัตรากำไรสุทธิ ${input.netMarginTTM.toFixed(1)}% อยู่ในระดับดี`);
+      lines.push(`อัตรากำไรสุทธิ ${input.netMarginTTM.toFixed(2)}% อยู่ในระดับดี`);
       score += 0.5;
     } else {
-      lines.push(`อัตรากำไรสุทธิ ${input.netMarginTTM.toFixed(1)}% ค่อนข้างบาง ควรติดตามแนวโน้มต้นทุน`);
+      lines.push(`อัตรากำไรสุทธิ ${input.netMarginTTM.toFixed(2)}% ค่อนข้างบาง ควรติดตามแนวโน้มต้นทุน`);
       score -= 0.3;
     }
   }
 
   if (input.peTTM !== null) {
     if (input.peTTM > 60) {
-      lines.push(`P/E ปัจจุบันอยู่ที่ ${input.peTTM.toFixed(1)} เท่า ตลาดตีมูลค่าล่วงหน้าไปมากสำหรับการเติบโตในอนาคต — ความเสี่ยงด้าน valuation สูง`);
+      lines.push(`P/E ปัจจุบันอยู่ที่ ${input.peTTM.toFixed(2)} เท่า ตลาดตีมูลค่าล่วงหน้าไปมากสำหรับการเติบโตในอนาคต — ความเสี่ยงด้าน valuation สูง`);
       score -= 1;
     } else if (input.peTTM > 35) {
-      lines.push(`P/E ปัจจุบันอยู่ที่ ${input.peTTM.toFixed(1)} เท่า ยังสะท้อนความคาดหวังการเติบโตสูงกว่าตลาดโดยรวม`);
+      lines.push(`P/E ปัจจุบันอยู่ที่ ${input.peTTM.toFixed(2)} เท่า ยังสะท้อนความคาดหวังการเติบโตสูงกว่าตลาดโดยรวม`);
       score -= 0.3;
     } else {
-      lines.push(`P/E ปัจจุบันอยู่ที่ ${input.peTTM.toFixed(1)} เท่า อยู่ในระดับที่ตลาดยังไม่ได้ตีมูลค่าล่วงหน้าสูงจนน่ากังวล`);
+      lines.push(`P/E ปัจจุบันอยู่ที่ ${input.peTTM.toFixed(2)} เท่า อยู่ในระดับที่ตลาดยังไม่ได้ตีมูลค่าล่วงหน้าสูงจนน่ากังวล`);
       score += 0.5;
     }
   }
@@ -185,9 +185,9 @@ export function buildFundamentalRead(input: FundamentalInputs): {
     const range = input.week52High - input.week52Low;
     const position = range > 0 ? (input.price - input.week52Low) / range : 0.5;
     if (position > 0.9) {
-      lines.push(`ราคาปัจจุบันอยู่ใกล้จุดสูงสุดในรอบ 52 สัปดาห์ (${(position * 100).toFixed(0)}% ของกรอบ) — โมเมนตัมเชิงบวกแข็งแรงแต่ upside ระยะสั้นเริ่มจำกัด`);
+      lines.push(`ราคาปัจจุบันอยู่ใกล้จุดสูงสุดในรอบ 52 สัปดาห์ (${(position * 100).toFixed(2)}% ของกรอบ) — โมเมนตัมเชิงบวกแข็งแรงแต่ upside ระยะสั้นเริ่มจำกัด`);
     } else if (position < 0.15) {
-      lines.push(`ราคาปัจจุบันอยู่ใกล้จุดต่ำสุดในรอบ 52 สัปดาห์ (${(position * 100).toFixed(0)}% ของกรอบ) — อาจเป็นโซนสะสมหากปัจจัยพื้นฐานยังไม่เปลี่ยนแปลง`);
+      lines.push(`ราคาปัจจุบันอยู่ใกล้จุดต่ำสุดในรอบ 52 สัปดาห์ (${(position * 100).toFixed(2)}% ของกรอบ) — อาจเป็นโซนสะสมหากปัจจัยพื้นฐานยังไม่เปลี่ยนแปลง`);
     }
   }
 

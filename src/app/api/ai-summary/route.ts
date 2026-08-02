@@ -24,9 +24,9 @@ const TONE_INSTRUCTION =
 
 function fmtUsd(v: number | null) {
   if (v === null) return "ไม่มีข้อมูล";
-  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  return `$${v.toFixed(0)}`;
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+  return `$${v.toFixed(2)}`;
 }
 
 async function buildFinancialsPrompt(): Promise<string> {
@@ -40,7 +40,7 @@ async function buildFinancialsPrompt(): Promise<string> {
   const lines = quarters.map(
     (q) =>
       `- ${q.periodLabel}: รายได้ ${fmtUsd(q.revenue)}, กำไรสุทธิ ${fmtUsd(q.netIncome)}, ` +
-      `อัตรากำไรขั้นต้น ${q.grossMargin?.toFixed(1) ?? "ไม่มีข้อมูล"}%, อัตรากำไรสุทธิ ${q.netMargin?.toFixed(1) ?? "ไม่มีข้อมูล"}%, ` +
+      `อัตรากำไรขั้นต้น ${q.grossMargin?.toFixed(2) ?? "ไม่มีข้อมูล"}%, อัตรากำไรสุทธิ ${q.netMargin?.toFixed(2) ?? "ไม่มีข้อมูล"}%, ` +
       `กระแสเงินสดอิสระ ${fmtUsd(q.freeCashFlow)}`
   );
 
