@@ -45,6 +45,7 @@ export function PositionPanel() {
   const [editDate, setEditDate] = useState("");
   const [editShares, setEditShares] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const refresh = () =>
     fetch("/api/position")
@@ -131,6 +132,7 @@ export function PositionPanel() {
   }
 
   async function handleDelete(id: string) {
+    setConfirmDeleteId(null);
     setLots((prev) => prev.filter((l) => l.id !== id));
     await fetch(`/api/position/${id}`, { method: "DELETE" });
   }
@@ -264,24 +266,42 @@ export function PositionPanel() {
                       {lot.shares.toLocaleString()} หุ้น
                       <span className="telemetry text-text-secondary"> · ${lot.pricePerShare.toFixed(2)}</span>
                     </p>
-                    <p className="telemetry text-[10px] text-text-muted">
-                      {new Date(lot.purchaseDate).toLocaleDateString("th-TH")}
-                    </p>
+                    <p className="telemetry text-[10px] text-text-muted">{toDisplayDate(lot.purchaseDate)}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <button
-                      onClick={() => startEdit(lot)}
-                      className="telemetry text-[11px] rounded px-2 py-1 text-text-muted bg-white/5 hover:text-text-primary"
-                    >
-                      แก้ไข
-                    </button>
-                    <button
-                      onClick={() => handleDelete(lot.id)}
-                      className="text-text-muted hover:text-ch-alert transition-colors"
-                      aria-label="ลบ"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </button>
+                    {confirmDeleteId === lot.id ? (
+                      <>
+                        <span className="text-[11px] text-text-muted">ลบรายการนี้?</span>
+                        <button
+                          onClick={() => handleDelete(lot.id)}
+                          className="telemetry text-[11px] rounded px-2 py-1 text-ch-alert bg-ch-alert/10 hover:brightness-125"
+                        >
+                          ยืนยันลบ
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="telemetry text-[11px] rounded px-2 py-1 text-text-muted bg-white/5"
+                        >
+                          ยกเลิก
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => startEdit(lot)}
+                          className="telemetry text-[11px] rounded px-2 py-1 text-text-muted bg-white/5 hover:text-text-primary"
+                        >
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(lot.id)}
+                          className="text-text-muted hover:text-ch-alert transition-colors"
+                          aria-label="ลบ"
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </li>
               )
