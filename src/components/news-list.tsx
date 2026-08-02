@@ -4,21 +4,28 @@ import { useEffect, useState } from "react";
 import { IconExternal } from "./icons";
 import type { FinnhubNewsItem } from "@/lib/finnhub";
 
-export function NewsList() {
+export function NewsList({ symbol = "NVDA" }: { symbol?: string }) {
   const [news, setNews] = useState<FinnhubNewsItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
 
   useEffect(() => {
-    fetch("/api/news")
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the symbol changes
+    setStatus("loading");
+    fetch(`/api/news?symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.error === "MISSING_API_KEY") return setStatus("no_key");
         if (data.error || !data.news) return setStatus("error");
         setNews(data.news);
         setStatus("ready");
       })
-      .catch(() => setStatus("error"));
-  }, []);
+      .catch(() => !cancelled && setStatus("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
 
   if (status === "loading") {
     return <p className="text-sm text-text-muted px-1">กำลังโหลดข่าว…</p>;
@@ -30,7 +37,7 @@ export function NewsList() {
     return <p className="text-sm text-text-muted px-1">โหลดข่าวไม่สำเร็จ ลองรีเฟรชอีกครั้ง</p>;
   }
   if (news.length === 0) {
-    return <p className="text-sm text-text-muted px-1">ไม่พบข่าวล่าสุดเกี่ยวกับ NVDA ในช่วงนี้</p>;
+    return <p className="text-sm text-text-muted px-1">ไม่พบข่าวล่าสุดเกี่ยวกับ {symbol} ในช่วงนี้</p>;
   }
 
   return (

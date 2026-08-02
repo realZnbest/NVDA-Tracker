@@ -13,7 +13,8 @@ import { SYMBOL } from "@/lib/timeframes";
 type SummaryType = "news" | "financials";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
-const cache = new Map<SummaryType, { expires: number; text: string }>();
+// Keyed by "type:symbol" so AAPL's cached summary never serves NVDA's, or vice versa.
+const cache = new Map<string, { expires: number; text: string }>();
 
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -29,10 +30,10 @@ function fmtUsd(v: number | null) {
   return `$${v.toFixed(2)}`;
 }
 
-async function buildFinancialsPrompt(): Promise<string> {
+async function buildFinancialsPrompt(symbol: string): Promise<string> {
   const [reported, basic] = await Promise.all([
-    getReportedFinancials(SYMBOL, "quarterly"),
-    getBasicFinancials(SYMBOL),
+    getReportedFinancials(symbol, "quarterly"),
+    getBasicFinancials(symbol),
   ]);
   const quarters = extractAllQuarters(reported).slice(-4);
   const m = basic.metric;
@@ -44,7 +45,7 @@ async function buildFinancialsPrompt(): Promise<string> {
       `กระแสเงินสดอิสระ ${fmtUsd(q.freeCashFlow)}`
   );
 
-  return `คุณเป็นนักวิเคราะห์การลงทุนมืออาชีพ ทำหน้าที่สรุปงบการเงินหุ้น NVIDIA (NVDA) ให้นักลงทุนรายย่อยชาวไทย
+  return `คุณเป็นนักวิเคราะห์การลงทุนมืออาชีพ ทำหน้าที่สรุปงบการเงินหุ้น ${symbol} ให้นักลงทุนรายย่อยชาวไทย
 ข้อมูลงบการเงิน 4 ไตรมาสล่าสุด (เรียงเก่าไปใหม่):
 ${lines.join("\n")}
 
@@ -66,10 +67,10 @@ ${TONE_INSTRUCTION} ใช้เฉพาะตัวเลขที่ให้
 - P/E ที่ X เท่า สะท้อนตลาดยังคาดหวังการเติบโตสูงต่อเนื่อง`;
 }
 
-async function buildNewsPrompt(): Promise<string> {
+async function buildNewsPrompt(symbol: string): Promise<string> {
   const to = new Date();
   const from = new Date(to.getTime() - 21 * 24 * 60 * 60 * 1000);
-  const news = await getCompanyNews(SYMBOL, isoDate(from), isoDate(to));
+  const news = await getCompanyNews(symbol, isoDate(from), isoDate(to));
   const items = filterRelevantNews(news)
     .sort((a, b) => b.datetime - a.datetime)
     .slice(0, 10);
@@ -80,7 +81,7 @@ async function buildNewsPrompt(): Promise<string> {
 
   const lines = items.map((n) => `- [${n.source}] ${n.headline}: ${n.summary}`);
 
-  return `คุณเป็นนักวิเคราะห์การลงทุนมืออาชีพ ทำหน้าที่สรุปข่าวหุ้น NVIDIA (NVDA) ให้นักลงทุนรายย่อยชาวไทย
+  return `คุณเป็นนักวิเคราะห์การลงทุนมืออาชีพ ทำหน้าที่สรุปข่าวหุ้น ${symbol} ให้นักลงทุนรายย่อยชาวไทย
 ข่าวล่าสุด 2 สัปดาห์ที่ผ่านมา:
 ${lines.join("\n")}
 
@@ -96,16 +97,19 @@ export async function GET(request: NextRequest) {
   if (type !== "news" && type !== "financials") {
     return NextResponse.json({ error: "INVALID_TYPE" }, { status: 400 });
   }
+  const symbol = request.nextUrl.searchParams.get("symbol") ?? SYMBOL;
+  const cacheKey = `${type}:${symbol}`;
 
-  const hit = cache.get(type);
+  const hit = cache.get(cacheKey);
   if (hit && hit.expires > Date.now()) {
     return NextResponse.json({ summary: hit.text });
   }
 
   try {
-    const prompt = type === "financials" ? await buildFinancialsPrompt() : await buildNewsPrompt();
+    const prompt =
+      type === "financials" ? await buildFinancialsPrompt(symbol) : await buildNewsPrompt(symbol);
     const summary = await generateSummary(prompt);
-    cache.set(type, { expires: Date.now() + CACHE_TTL_MS, text: summary });
+    cache.set(cacheKey, { expires: Date.now() + CACHE_TTL_MS, text: summary });
     return NextResponse.json({ summary });
   } catch (err) {
     if (err instanceof AiError || err instanceof FinnhubError) {

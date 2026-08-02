@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getBasicFinancials, getReportedFinancials, FinnhubError } from "@/lib/finnhub";
 import { SYMBOL } from "@/lib/timeframes";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const symbol = request.nextUrl.searchParams.get("symbol") ?? SYMBOL;
   try {
     const [reported, metrics] = await Promise.all([
-      getReportedFinancials(SYMBOL, "quarterly"),
-      getBasicFinancials(SYMBOL),
+      getReportedFinancials(symbol, "quarterly"),
+      getBasicFinancials(symbol),
     ]);
     return NextResponse.json({ reported, metrics: metrics.metric });
   } catch (err) {

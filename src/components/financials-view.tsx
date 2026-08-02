@@ -15,15 +15,19 @@ const fmtUsd = (v: number) => {
 const fmtPct = (v: number) => `${v.toFixed(2)}%`;
 const fmtEps = (v: number) => `$${v.toFixed(2)}`;
 
-export function FinancialsView() {
+export function FinancialsView({ symbol = "NVDA" }: { symbol?: string }) {
   const [quarters, setQuarters] = useState<QuarterMetrics[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
 
   useEffect(() => {
-    fetch("/api/financials")
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the symbol changes
+    setStatus("loading");
+    fetch(`/api/financials?symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.error === "MISSING_API_KEY") return setStatus("no_key");
         if (data.error || !data.reported) return setStatus("error");
         const reported = data.reported as FinnhubReportedFinancials;
@@ -31,8 +35,11 @@ export function FinancialsView() {
         setMetrics(data.metrics ?? {});
         setStatus("ready");
       })
-      .catch(() => setStatus("error"));
-  }, []);
+      .catch(() => !cancelled && setStatus("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
 
   if (status === "loading") return <p className="text-sm text-text-muted px-1">กำลังโหลดงบการเงิน…</p>;
   if (status === "no_key")

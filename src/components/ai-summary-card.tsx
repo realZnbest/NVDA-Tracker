@@ -5,13 +5,21 @@ import { IconSpark } from "./icons";
 
 type Status = "loading" | "ready" | "error" | "no_key" | "no_data";
 
-export function AiSummaryCard({ type }: { type: "news" | "financials" }) {
+export function AiSummaryCard({
+  type,
+  symbol = "NVDA",
+}: {
+  type: "news" | "financials";
+  symbol?: string;
+}) {
   const [summary, setSummary] = useState("");
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/ai-summary?type=${type}`)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the symbol changes
+    setStatus("loading");
+    fetch(`/api/ai-summary?type=${type}&symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -25,7 +33,7 @@ export function AiSummaryCard({ type }: { type: "news" | "financials" }) {
     return () => {
       cancelled = true;
     };
-  }, [type]);
+  }, [type, symbol]);
 
   return (
     <div className="module-galaxy">

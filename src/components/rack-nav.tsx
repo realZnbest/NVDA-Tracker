@@ -2,22 +2,27 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useParams, useRouter } from "next/navigation";
 import { IconBell, IconLedger, IconSignal, IconWallet, IconWave } from "./icons";
 import { NotificationBell } from "./notification-bell";
 import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 
+// Only /financials and /news have a symbol-aware href — they get their own /[symbol]
+// route segment, so the nav link should follow whatever symbol the user is currently
+// looking at instead of always bouncing back to the bare (NVDA) route.
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave },
-  { href: "/financials", label: "งบการเงิน", icon: IconLedger },
-  { href: "/news", label: "ข่าว", icon: IconSignal },
-  { href: "/portfolio", label: "พอร์ตของฉัน", icon: IconWallet },
-  { href: "/alerts", label: "การแจ้งเตือน", icon: IconBell },
+  { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave, symbolAware: false },
+  { href: "/financials", label: "งบการเงิน", icon: IconLedger, symbolAware: true },
+  { href: "/news", label: "ข่าว", icon: IconSignal, symbolAware: true },
+  { href: "/portfolio", label: "พอร์ตของฉัน", icon: IconWallet, symbolAware: false },
+  { href: "/alerts", label: "การแจ้งเตือน", icon: IconBell, symbolAware: false },
 ] as const;
 
 export function RackNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const params = useParams<{ symbol?: string }>();
+  const activeSymbol = params?.symbol;
   const [query, setQuery] = useState("");
 
   function handleSelect(result: SymbolSearchResult) {
@@ -32,10 +37,11 @@ export function RackNav() {
           {NAV_ITEMS.map((item) => {
             const active = pathname?.startsWith(item.href);
             const Icon = item.icon;
+            const href = item.symbolAware && activeSymbol ? `${item.href}/${activeSymbol}` : item.href;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={href}
                 className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm border-b-2 transition-colors ${
                   active
                     ? "border-ch-price text-text-primary"
