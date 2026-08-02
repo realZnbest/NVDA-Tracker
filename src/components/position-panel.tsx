@@ -6,19 +6,28 @@ import { IconPlus, IconTrash } from "./icons";
 import { useAlertsContext } from "./alerts-provider";
 import { AlertsPasswordGate } from "./alerts-password-gate";
 
-function toDateInputValue(ts: number): string {
-  // Use local calendar fields, not toISOString() (UTC) — fromDateInputValue below
-  // constructs the timestamp at local midnight, so converting back via UTC would
-  // shift the date by a day for any timezone ahead of UTC (e.g. Thailand, UTC+7).
+// Plain text field instead of <input type="date"> — native date pickers render using
+// the browser/OS's own chrome, which doesn't reliably respect our CSS box (width, right
+// edge alignment with sibling inputs) across engines/devices, and formats the value using
+// device locale (e.g. Buddhist-calendar "2 Aug BE 2569" on a Thai-locale phone) regardless
+// of our own CSS. A plain text input renders identically to the other fields everywhere.
+function toDisplayDate(ts: number): string {
   const d = new Date(ts);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
-function fromDateInputValue(value: string): number {
-  return new Date(`${value}T00:00:00`).getTime();
+function parseDisplayDate(value: string): number | null {
+  const m = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  return d.getTime();
 }
 
 export function PositionPanel() {
@@ -45,7 +54,7 @@ export function PositionPanel() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- default the date field to today on mount
-    setPurchaseDate(toDateInputValue(Date.now()));
+    setPurchaseDate(toDisplayDate(Date.now()));
   }, []);
 
   useEffect(() => {
@@ -80,13 +89,14 @@ export function PositionPanel() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!shares || !pricePerShare) return;
+    const parsedDate = parseDisplayDate(purchaseDate);
+    if (!parsedDate || !shares || !pricePerShare) return;
     setSubmitting(true);
     await fetch("/api/position", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        purchaseDate: fromDateInputValue(purchaseDate),
+        purchaseDate: parsedDate,
         shares: Number(shares),
         pricePerShare: Number(pricePerShare),
       }),
@@ -99,17 +109,19 @@ export function PositionPanel() {
 
   function startEdit(lot: PositionLot) {
     setEditingId(lot.id);
-    setEditDate(toDateInputValue(lot.purchaseDate));
+    setEditDate(toDisplayDate(lot.purchaseDate));
     setEditShares(String(lot.shares));
     setEditPrice(String(lot.pricePerShare));
   }
 
   async function handleSaveEdit(id: string) {
+    const parsedDate = parseDisplayDate(editDate);
+    if (!parsedDate) return;
     await fetch(`/api/position/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        purchaseDate: fromDateInputValue(editDate),
+        purchaseDate: parsedDate,
         shares: Number(editShares),
         pricePerShare: Number(editPrice),
       }),
@@ -145,11 +157,12 @@ export function PositionPanel() {
         <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
           <label className="module-label">วันที่ซื้อ</label>
           <input
-            type="date"
-            lang="en-GB"
+            type="text"
+            inputMode="numeric"
             value={purchaseDate}
             onChange={(e) => setPurchaseDate(e.target.value)}
-            className="w-full min-w-0 max-w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-auto"
+            placeholder="DD/MM/YYYY"
+            className="telemetry w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-32"
             required
           />
         </div>
@@ -207,11 +220,12 @@ export function PositionPanel() {
               editingId === lot.id ? (
                 <li key={lot.id} className="flex flex-wrap items-end gap-3 px-4 py-3 border-b border-seam/60 last:border-b-0">
                   <input
-                    type="date"
-                    lang="en-GB"
+                    type="text"
+                    inputMode="numeric"
                     value={editDate}
                     onChange={(e) => setEditDate(e.target.value)}
-                    className="min-w-0 max-w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
+                    placeholder="DD/MM/YYYY"
+                    className="telemetry w-28 rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
                   />
                   <input
                     type="number"
