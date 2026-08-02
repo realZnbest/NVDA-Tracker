@@ -16,11 +16,21 @@ const NASDAQ_SYMBOL = "QQQ";
 
 const CH = {
   price: "#79b900",
-  benchmark: "#5b8fd9",
-  nasdaq: "#e0629c",
+  benchmark: "#f2453f",
+  nasdaq: "#4f9cf5",
   text: "#9aa4b2",
   seam: "#262c35",
 };
+
+function sign(n: number): -1 | 0 | 1 {
+  if (n > 0) return 1;
+  if (n < 0) return -1;
+  return 0;
+}
+
+function gapText(diff: number): string {
+  return `${Math.abs(diff).toFixed(2)} จุดเปอร์เซ็นต์`;
+}
 
 function toPercentSeries(candles: FinnhubCandles) {
   if (candles.c.length === 0) return [];
@@ -155,7 +165,64 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
       {status === "error" && <p className="text-sm text-text-muted px-4 py-6">โหลดข้อมูลไม่สำเร็จ</p>}
 
       <div ref={containerRef} className="h-60 w-full" />
+
+      {status === "ready" && nvdaChange !== null && sp500Change !== null && nasdaqChange !== null && (
+        <ComparisonSummary nvda={nvdaChange} sp500={sp500Change} nasdaq={nasdaqChange} />
+      )}
     </div>
+  );
+}
+
+function Gap({ diff }: { diff: number }) {
+  return (
+    <span className="telemetry" style={{ color: diff >= 0 ? "var(--up)" : "var(--down)" }}>
+      {gapText(diff)}
+    </span>
+  );
+}
+
+function ComparisonSummary({ nvda, sp500, nasdaq }: { nvda: number; sp500: number; nasdaq: number }) {
+  const diffSp = nvda - sp500;
+  const diffNq = nvda - nasdaq;
+  const sSp = sign(diffSp);
+  const sNq = sign(diffNq);
+
+  const wrapperClass = "text-xs text-text-secondary leading-relaxed px-4 py-2.5 border-t border-seam/60";
+
+  if (sSp > 0 && sNq > 0) {
+    return (
+      <p className={wrapperClass}>
+        NVDA ชนะตลาดในช่วงเวลานี้ นำทั้ง S&P 500 อยู่ <Gap diff={diffSp} /> และ NASDAQ 100 อยู่ <Gap diff={diffNq} />
+      </p>
+    );
+  }
+  if (sSp < 0 && sNq < 0) {
+    return (
+      <p className={wrapperClass}>
+        NVDA แพ้ตลาดในช่วงเวลานี้ ตามหลังทั้ง S&P 500 อยู่ <Gap diff={diffSp} /> และ NASDAQ 100 อยู่ <Gap diff={diffNq} />
+      </p>
+    );
+  }
+
+  const spVerb = sSp > 0 ? "นำ" : sSp < 0 ? "ตามหลัง" : "เท่ากับ";
+  const nqVerb = sNq > 0 ? "นำ" : sNq < 0 ? "ตามหลัง" : "เท่ากับ";
+  return (
+    <p className={wrapperClass}>
+      ในกรอบเวลาที่เลือก NVDA {spVerb} S&P 500
+      {sSp !== 0 && (
+        <>
+          {" "}
+          อยู่ <Gap diff={diffSp} />
+        </>
+      )}{" "}
+      แต่{nqVerb} NASDAQ 100
+      {sNq !== 0 && (
+        <>
+          {" "}
+          อยู่ <Gap diff={diffNq} />
+        </>
+      )}
+    </p>
   );
 }
 
