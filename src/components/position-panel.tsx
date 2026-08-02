@@ -122,6 +122,7 @@ export function PositionPanel() {
         <div className="module p-4 flex flex-wrap gap-6">
           <Stat label="หุ้นทั้งหมด" value={aggregate.totalShares.toLocaleString()} />
           <Stat label="ต้นทุนเฉลี่ย" value={`$${aggregate.avgCost.toFixed(2)}`} />
+          <Stat label="ต้นทุนรวม" value={`$${metrics.costBasis.toFixed(2)}`} />
           <Stat label="มูลค่าปัจจุบัน" value={`$${metrics.value.toFixed(2)}`} />
           <Stat
             label="กำไร/ขาดทุน"
