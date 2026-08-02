@@ -11,11 +11,13 @@ import {
 import { scopeCandles, type TimeframeKey } from "@/lib/timeframes";
 import type { FinnhubCandles } from "@/lib/finnhub";
 
-const BENCHMARK_SYMBOL = "SPY";
+const SP500_SYMBOL = "SPY";
+const NASDAQ_SYMBOL = "QQQ";
 
 const CH = {
   price: "#79b900",
   benchmark: "#5b8fd9",
+  nasdaq: "#e0629c",
   text: "#9aa4b2",
   seam: "#262c35",
 };
@@ -33,11 +35,13 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const nvdaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const benchmarkSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const sp500SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const nasdaqSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
   const [nvdaChange, setNvdaChange] = useState<number | null>(null);
-  const [benchmarkChange, setBenchmarkChange] = useState<number | null>(null);
+  const [sp500Change, setSp500Change] = useState<number | null>(null);
+  const [nasdaqChange, setNasdaqChange] = useState<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -65,8 +69,14 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
       priceFormat: { type: "custom", formatter: (v: number) => `${v.toFixed(2)}%`, minMove: 0.01 },
       priceLineVisible: false,
     });
-    benchmarkSeriesRef.current = chart.addSeries(LineSeries, {
+    sp500SeriesRef.current = chart.addSeries(LineSeries, {
       color: CH.benchmark,
+      lineWidth: 2,
+      priceFormat: { type: "custom", formatter: (v: number) => `${v.toFixed(2)}%`, minMove: 0.01 },
+      priceLineVisible: false,
+    });
+    nasdaqSeriesRef.current = chart.addSeries(LineSeries, {
+      color: CH.nasdaq,
       lineWidth: 2,
       priceFormat: { type: "custom", formatter: (v: number) => `${v.toFixed(2)}%`, minMove: 0.01 },
       priceLineVisible: false,
@@ -85,30 +95,39 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
 
     Promise.all([
       fetch(`/api/candles?tf=${timeframe}`).then((r) => r.json()),
-      fetch(`/api/candles?tf=${timeframe}&symbol=${BENCHMARK_SYMBOL}`).then((r) => r.json()),
+      fetch(`/api/candles?tf=${timeframe}&symbol=${SP500_SYMBOL}`).then((r) => r.json()),
+      fetch(`/api/candles?tf=${timeframe}&symbol=${NASDAQ_SYMBOL}`).then((r) => r.json()),
     ])
-      .then(([nvdaData, benchmarkData]) => {
+      .then(([nvdaData, sp500Data, nasdaqData]) => {
         if (cancelled) return;
         if (nvdaData.error === "MISSING_API_KEY") {
           setStatus("no_key");
           return;
         }
-        if (nvdaData.error || !nvdaData.candles || benchmarkData.error || !benchmarkData.candles) {
+        if (
+          nvdaData.error || !nvdaData.candles ||
+          sp500Data.error || !sp500Data.candles ||
+          nasdaqData.error || !nasdaqData.candles
+        ) {
           setStatus("error");
           return;
         }
 
         const nvdaScoped = scopeCandles(nvdaData.candles as FinnhubCandles, timeframe);
-        const benchmarkScoped = scopeCandles(benchmarkData.candles as FinnhubCandles, timeframe);
+        const sp500Scoped = scopeCandles(sp500Data.candles as FinnhubCandles, timeframe);
+        const nasdaqScoped = scopeCandles(nasdaqData.candles as FinnhubCandles, timeframe);
         const nvdaPct = toPercentSeries(nvdaScoped);
-        const benchmarkPct = toPercentSeries(benchmarkScoped);
+        const sp500Pct = toPercentSeries(sp500Scoped);
+        const nasdaqPct = toPercentSeries(nasdaqScoped);
 
         nvdaSeriesRef.current?.setData(nvdaPct);
-        benchmarkSeriesRef.current?.setData(benchmarkPct);
+        sp500SeriesRef.current?.setData(sp500Pct);
+        nasdaqSeriesRef.current?.setData(nasdaqPct);
         chartRef.current?.timeScale().fitContent();
 
         setNvdaChange(nvdaPct.length > 0 ? nvdaPct[nvdaPct.length - 1].value : null);
-        setBenchmarkChange(benchmarkPct.length > 0 ? benchmarkPct[benchmarkPct.length - 1].value : null);
+        setSp500Change(sp500Pct.length > 0 ? sp500Pct[sp500Pct.length - 1].value : null);
+        setNasdaqChange(nasdaqPct.length > 0 ? nasdaqPct[nasdaqPct.length - 1].value : null);
         setStatus("ready");
       })
       .catch(() => !cancelled && setStatus("error"));
@@ -121,10 +140,11 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
   return (
     <div className="module flex flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-seam px-4 py-2.5">
-        <span className="module-label">เทียบกับตลาดรวม (S&P 500)</span>
+        <span className="module-label">เทียบกับตลาดรวม</span>
         <div className="flex items-center gap-4 text-[11px]">
           <Legend label="NVDA" color={CH.price} value={nvdaChange} />
-          <Legend label="S&P 500" color={CH.benchmark} value={benchmarkChange} />
+          <Legend label="S&P 500" color={CH.benchmark} value={sp500Change} />
+          <Legend label="NASDAQ 100" color={CH.nasdaq} value={nasdaqChange} />
         </div>
       </div>
 
