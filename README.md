@@ -1,6 +1,6 @@
 # NVDA Instrument Wall
 
-A personal NVIDIA (NVDA) analysis dashboard: candlestick price chart with RSI/MACD/MA/Bollinger, support/resistance and BOS/CHoCH structure detection, a curated news feed, financial statement trends, rule-based technical + fundamental analysis, AI-generated casual-Thai summaries, Wall Street analyst consensus, threshold alerts, and private portfolio tracking (purchase lots, break-even line, position-aware analysis). Thai-language UI throughout.
+A personal NVIDIA (NVDA) analysis dashboard: candlestick price chart with RSI/MACD/MA/Bollinger, support/resistance and BOS/CHoCH structure detection, a curated news feed, financial statement trends, rule-based technical + fundamental analysis, AI-generated summaries and an AI chat widget, Wall Street analyst consensus, threshold alerts, and private portfolio tracking (purchase lots, break-even line, position-aware analysis). Thai-language UI throughout.
 
 ## Setup
 
@@ -44,6 +44,7 @@ The break-even line on the price chart and the "ด้านพอร์ต" lin
 
 - Data provider is Finnhub's free tier (quote, news, financials, analyst recommendation trends — 60 requests/min, cached server-side) plus Yahoo Finance's free chart endpoint (historical candles and pre/post-market prices; Finnhub's own candle and price-target endpoints are paid-only, and an earlier attempt to get price targets from an unofficial Yahoo endpoint was abandoned after it proved permanently rate-limited from Render's IP — see `PRODUCT.md`).
 - The AI summary cards try a chain of providers in order — Gemini keys, then Groq keys, then OpenRouter keys, whichever are configured — falling through to the next one if a key hits its free-tier rate limit. Responses are cached server-side for 1 hour per page. Without any key set, those cards just show a "not configured" message — everything else in the app works fine without it.
+- The AI chat widget (bottom-right on `/dashboard`, public, no auth) shares the exact same provider chain and keys — no separate setup needed. Each reply is grounded with live quote/news/financials context pulled from the same cached Finnhub calls the rest of the dashboard uses. Rate-limited per IP (20 messages/10 min, in-memory — resets on redeploy) and capped at 500 characters per message to keep costs bounded on a public, unauthenticated endpoint. Shows a persistent "not investment advice" disclaimer and fails gracefully with a Thai message if every provider is unavailable.
 - Alerts are stored in Turso and evaluated on a ~90s interval, but only while you're logged in with `ALERTS_PASSWORD` in an open tab (there's no separate scheduled job).
 - (Optional) Set `RESEND_API_KEY` and `ALERT_EMAIL_TO` to also get an email the moment an alert fires, on top of the in-app notification — see `.env.local.example`. Free tier, no card required.
 - See `DESIGN.md` for the visual system and `PRODUCT.md` for product scope.

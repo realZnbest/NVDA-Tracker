@@ -1,17 +1,31 @@
 export class AiError extends Error {}
 
-interface Attempt {
-  name: string;
-  call: (prompt: string) => Promise<string>;
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
-async function callGemini(apiKey: string, model: string, prompt: string): Promise<string> {
+interface Attempt {
+  name: string;
+  call: (messages: ChatMessage[], system?: string) => Promise<string>;
+}
+
+async function callGemini(
+  apiKey: string,
+  model: string,
+  messages: ChatMessage[],
+  system?: string
+): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: messages.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      })),
+      ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
       generationConfig: {
         // A short casual-tone summary doesn't need extended reasoning — keeps it fast and cheap.
         thinkingConfig: { thinkingBudget: 0 },
@@ -33,7 +47,8 @@ async function callOpenAiCompatible(
   baseUrl: string,
   apiKey: string,
   model: string,
-  prompt: string
+  messages: ChatMessage[],
+  system?: string
 ): Promise<string> {
   const res = await fetch(baseUrl, {
     method: "POST",
@@ -43,7 +58,7 @@ async function callOpenAiCompatible(
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: "user", content: prompt }],
+      messages: system ? [{ role: "system", content: system }, ...messages] : messages,
       temperature: 0.6,
       max_tokens: 400,
     }),
@@ -68,7 +83,7 @@ function buildProviderChain(): Attempt[] {
   geminiKeys.forEach((key, i) =>
     attempts.push({
       name: `gemini${i > 0 ? `-${i + 1}` : ""}`,
-      call: (prompt) => callGemini(key, geminiModel, prompt),
+      call: (messages, system) => callGemini(key, geminiModel, messages, system),
     })
   );
 
@@ -79,8 +94,8 @@ function buildProviderChain(): Attempt[] {
   groqKeys.forEach((key, i) =>
     attempts.push({
       name: `groq${i > 0 ? `-${i + 1}` : ""}`,
-      call: (prompt) =>
-        callOpenAiCompatible("https://api.groq.com/openai/v1/chat/completions", key, groqModel, prompt),
+      call: (messages, system) =>
+        callOpenAiCompatible("https://api.groq.com/openai/v1/chat/completions", key, groqModel, messages, system),
     })
   );
 
@@ -92,8 +107,14 @@ function buildProviderChain(): Attempt[] {
   openRouterKeys.forEach((key, i) =>
     attempts.push({
       name: `openrouter${i > 0 ? `-${i + 1}` : ""}`,
-      call: (prompt) =>
-        callOpenAiCompatible("https://openrouter.ai/api/v1/chat/completions", key, openRouterModel, prompt),
+      call: (messages, system) =>
+        callOpenAiCompatible(
+          "https://openrouter.ai/api/v1/chat/completions",
+          key,
+          openRouterModel,
+          messages,
+          system
+        ),
     })
   );
 
@@ -105,17 +126,21 @@ function buildProviderChain(): Attempt[] {
  * OpenRouter keys) and returns the first successful response — spreads usage across
  * free-tier quotas so one provider running out doesn't take the feature down.
  */
-export async function generateSummary(prompt: string): Promise<string> {
+export async function generateChatReply(messages: ChatMessage[], system?: string): Promise<string> {
   const chain = buildProviderChain();
   if (chain.length === 0) throw new AiError("MISSING_AI_API_KEY");
 
   let lastError: unknown = new AiError("ALL_PROVIDERS_FAILED");
   for (const attempt of chain) {
     try {
-      return await attempt.call(prompt);
+      return await attempt.call(messages, system);
     } catch (err) {
       lastError = err;
     }
   }
   throw lastError;
+}
+
+export async function generateSummary(prompt: string): Promise<string> {
+  return generateChatReply([{ role: "user", content: prompt }]);
 }

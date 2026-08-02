@@ -7,6 +7,7 @@ import { AnalysisPanel } from "@/components/analysis-panel";
 import { AnalystPanel } from "@/components/analyst-panel";
 import { EarningsCountdown } from "@/components/earnings-countdown";
 import { BenchmarkChart } from "@/components/benchmark-chart";
+import { ChatWidget } from "@/components/chat-widget";
 import type { TimeframeKey } from "@/lib/timeframes";
 
 export default function DashboardPage() {
@@ -24,6 +25,7 @@ export default function DashboardPage() {
         </div>
       </div>
       <BenchmarkChart timeframe={timeframe} />
+      <ChatWidget />
     </div>
   );
 }
