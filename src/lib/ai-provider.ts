@@ -87,7 +87,11 @@ function buildProviderChain(): Attempt[] {
     })
   );
 
-  const groqModel = process.env.GROQ_MODEL ?? "openai/gpt-oss-20b";
+  // Not "openai/gpt-oss-20b" — that's a reasoning model that burns most of its token
+  // budget on hidden chain-of-thought before answering, which caused real truncated/cut-off
+  // summaries (see git history). Llama 3.3 70B is a plain instruct model, no reasoning
+  // tokens, more predictable output length.
+  const groqModel = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
   const groqKeys = [process.env.GROQ_API_KEY, process.env.GROQ_API_KEY_BACKUP].filter(
     (k): k is string => Boolean(k)
   );
@@ -99,7 +103,7 @@ function buildProviderChain(): Attempt[] {
     })
   );
 
-  const openRouterModel = process.env.OPENROUTER_MODEL ?? "openai/gpt-oss-20b:free";
+  const openRouterModel = process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free";
   const openRouterKeys = [
     process.env.OPENROUTER_API_KEY,
     process.env.OPENROUTER_API_KEY_BACKUP,
