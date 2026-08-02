@@ -11,35 +11,60 @@ export class FinnhubError extends Error {
   }
 }
 
+/**
+ * Falls back across up to 3 keys (different Finnhub accounts) on rate-limit/auth
+ * failure — same rotating-chain philosophy as the LLM provider chain in ai-provider.ts.
+ * A working primary key never triggers any rotation, so this costs nothing in the
+ * common case.
+ */
+function getFinnhubKeys(): string[] {
+  return [
+    process.env.FINNHUB_API_KEY,
+    process.env.FINNHUB_API_KEY_BACKUP,
+    process.env.FINNHUB_API_KEY_SECONDARY,
+  ].filter((k): k is string => Boolean(k));
+}
+
 async function fetchFinnhub<T>(
   path: string,
   params: Record<string, string | number>,
   ttlMs: number
 ): Promise<T> {
-  const apiKey = process.env.FINNHUB_API_KEY;
-  if (!apiKey) {
+  const keys = getFinnhubKeys();
+  if (keys.length === 0) {
     throw new FinnhubError("MISSING_API_KEY", 0);
   }
 
-  const search = new URLSearchParams({
-    ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
-    token: apiKey,
-  });
-  const url = `${BASE_URL}${path}?${search.toString()}`;
-  const cacheKey = url;
+  const search = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
+  );
+  // Cache key deliberately excludes the token — which key ends up serving a request
+  // shouldn't fragment the cache, or a rotation would keep missing cache hits that a
+  // different key already populated.
+  const cacheKey = `${path}?${search.toString()}`;
 
   const hit = cache.get(cacheKey);
   if (hit && hit.expires > Date.now()) {
     return hit.data as T;
   }
 
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new FinnhubError(`FINNHUB_HTTP_${res.status}`, res.status);
+  let lastError: FinnhubError = new FinnhubError("FINNHUB_HTTP_0", 0);
+  for (const apiKey of keys) {
+    const url = `${BASE_URL}${path}?${search.toString()}&token=${apiKey}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.ok) {
+      const data = (await res.json()) as T;
+      cache.set(cacheKey, { expires: Date.now() + ttlMs, data });
+      return data;
+    }
+    lastError = new FinnhubError(`FINNHUB_HTTP_${res.status}`, res.status);
+    // Only rotate on rate-limit/auth failures — anything else (400, 500, ...) isn't
+    // key-related, so trying another key would just mask the real error.
+    if (res.status !== 429 && res.status !== 401 && res.status !== 403) {
+      throw lastError;
+    }
   }
-  const data = (await res.json()) as T;
-  cache.set(cacheKey, { expires: Date.now() + ttlMs, data });
-  return data;
+  throw lastError;
 }
 
 export interface FinnhubQuote {
