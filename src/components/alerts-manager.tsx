@@ -154,6 +154,7 @@ export function AlertsManager() {
             </label>
             <input
               type="number"
+              inputMode="decimal"
               step="0.01"
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}

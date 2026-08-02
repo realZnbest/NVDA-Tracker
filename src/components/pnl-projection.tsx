@@ -99,6 +99,7 @@ export function PnlProjectionPanel({ symbol = "NVDA" }: { symbol?: string }) {
           <label className="module-label">เพิ่มราคาเป้าหมาย ($)</label>
           <input
             type="number"
+            inputMode="decimal"
             step="0.01"
             value={newTarget}
             onChange={(e) => setNewTarget(e.target.value)}

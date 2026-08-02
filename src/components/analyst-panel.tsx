@@ -20,16 +20,20 @@ function consensusFromTrend(trend: FinnhubRecommendationTrend): { label: string;
   return { label: "ขายทันที", color: "var(--down)" };
 }
 
-export function AnalystPanel() {
+export function AnalystPanel({ symbol }: { symbol: string }) {
   const [data, setData] = useState<AnalystResponse | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key" | "no_data">(
     "loading"
   );
 
   useEffect(() => {
-    fetch("/api/analyst")
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the symbol changes
+    setStatus("loading");
+    fetch(`/api/analyst?symbol=${symbol}`)
       .then((r) => r.json())
       .then((analyst) => {
+        if (cancelled) return;
         if (analyst.error === "MISSING_API_KEY") return setStatus("no_key");
         if (analyst.error === "NO_DATA" || !analyst.trends || analyst.trends.length === 0) {
           return setStatus("no_data");
@@ -37,8 +41,11 @@ export function AnalystPanel() {
         setData(analyst);
         setStatus("ready");
       })
-      .catch(() => setStatus("error"));
-  }, []);
+      .catch(() => !cancelled && setStatus("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
 
   return (
     <div className="module p-4">

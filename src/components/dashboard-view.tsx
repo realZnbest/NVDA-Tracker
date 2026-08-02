@@ -26,12 +26,6 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
     "1H"
   );
 
-  // AnalystPanel/EarningsCountdown/BenchmarkChart/ai-summary/chat still only fetch NVDA
-  // data under the hood — making those multi-symbol is the separate ticker-search/market-
-  // data effort, not this one. Rather than show NVDA data mislabeled as another symbol's,
-  // this dashboard simply omits them for any symbol besides NVDA.
-  const isNvda = symbol === "NVDA";
-
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4 p-4">
       <QuoteHeader symbol={symbol} />
@@ -39,12 +33,12 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
         <PriceChart symbol={symbol} timeframe={timeframe} onTimeframeChange={setTimeframe} />
         <div className="flex flex-col gap-4">
           <AnalysisPanel symbol={symbol} timeframe={timeframe} />
-          {isNvda && <AnalystPanel />}
-          {isNvda && <EarningsCountdown />}
+          <AnalystPanel symbol={symbol} />
+          <EarningsCountdown symbol={symbol} />
         </div>
       </div>
-      {isNvda && <BenchmarkChart timeframe={timeframe} />}
-      {isNvda && <ChatWidget />}
+      <BenchmarkChart symbol={symbol} timeframe={timeframe} />
+      <ChatWidget symbol={symbol} />
     </div>
   );
 }

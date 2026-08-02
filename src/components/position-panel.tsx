@@ -176,6 +176,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
           <label className="module-label">จำนวนหุ้น</label>
           <input
             type="number"
+            inputMode="decimal"
             step="0.0001"
             value={shares}
             onChange={(e) => setShares(e.target.value)}
@@ -188,6 +189,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
           <label className="module-label">ราคาต่อหุ้น ($)</label>
           <input
             type="number"
+            inputMode="decimal"
             step="0.01"
             value={pricePerShare}
             onChange={(e) => setPricePerShare(e.target.value)}
@@ -235,6 +237,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
                   />
                   <input
                     type="number"
+                    inputMode="decimal"
                     step="0.0001"
                     value={editShares}
                     onChange={(e) => setEditShares(e.target.value)}
@@ -242,6 +245,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
                   />
                   <input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={editPrice}
                     onChange={(e) => setEditPrice(e.target.value)}

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getEarningsCalendar, FinnhubError } from "@/lib/finnhub";
 import { SYMBOL } from "@/lib/timeframes";
 
@@ -6,12 +6,13 @@ function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const symbol = request.nextUrl.searchParams.get("symbol") ?? SYMBOL;
   try {
     const now = new Date();
     const from = toDateStr(now);
     const to = toDateStr(new Date(now.getTime() + 180 * 24 * 60 * 60_000));
-    const data = await getEarningsCalendar(SYMBOL, from, to);
+    const data = await getEarningsCalendar(symbol, from, to);
     const todayStr = toDateStr(now);
     const upcoming = data.earningsCalendar
       .filter((e) => e.date >= todayStr)

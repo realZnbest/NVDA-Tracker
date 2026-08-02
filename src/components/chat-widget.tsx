@@ -8,7 +8,7 @@ const MAX_MESSAGE_LENGTH = 500;
 
 type SendStatus = "idle" | "sending" | "rate_limited" | "unavailable";
 
-export function ChatWidget() {
+export function ChatWidget({ symbol }: { symbol: string }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -33,7 +33,7 @@ export function ChatWidget() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages }),
+        body: JSON.stringify({ messages: nextMessages, symbol }),
       });
       if (res.status === 429) {
         setStatus("rate_limited");
@@ -58,7 +58,7 @@ export function ChatWidget() {
           <div className="flex items-center justify-between border-b border-seam px-4 py-2.5">
             <div className="flex items-center gap-1.5">
               <IconSpark className="h-3.5 w-3.5 text-ch-rsi" />
-              <span className="module-label">ถามคำถามเกี่ยวกับ NVDA</span>
+              <span className="module-label">ถามคำถามเกี่ยวกับ {symbol}</span>
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -78,7 +78,7 @@ export function ChatWidget() {
 
           <div ref={listRef} className="scrollbar-thin flex h-80 flex-col gap-2.5 overflow-y-auto px-4 py-3">
             {messages.length === 0 && (
-              <p className="text-xs text-text-muted">ถามอะไรก็ได้เกี่ยวกับ NVDA หรือการลงทุนทั่วไป</p>
+              <p className="text-xs text-text-muted">ถามอะไรก็ได้เกี่ยวกับ {symbol} หรือการลงทุนทั่วไป</p>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>

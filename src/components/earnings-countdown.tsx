@@ -19,23 +19,30 @@ function formatCountdown(targetDate: string, now: number): string {
   return `อีก ${days} วัน ${hours} ชั่วโมง`;
 }
 
-export function EarningsCountdown() {
+export function EarningsCountdown({ symbol }: { symbol: string }) {
   const [event, setEvent] = useState<FinnhubEarningsEvent | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "no_data" | "no_key" | "error">("loading");
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    fetch("/api/earnings")
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the symbol changes
+    setStatus("loading");
+    fetch(`/api/earnings?symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.error === "MISSING_API_KEY") return setStatus("no_key");
         if (data.error) return setStatus("error");
         if (!data.event) return setStatus("no_data");
         setEvent(data.event);
         setStatus("ready");
       })
-      .catch(() => setStatus("error"));
-  }, []);
+      .catch(() => !cancelled && setStatus("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);

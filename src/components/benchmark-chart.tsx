@@ -45,7 +45,7 @@ function toPercentSeries(candles: FinnhubCandles) {
   }));
 }
 
-export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
+export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timeframe: TimeframeKey }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const nvdaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -111,7 +111,7 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
       if (mode === "initial") setStatus("loading");
 
       Promise.all([
-        fetch(`/api/candles?tf=${timeframe}`).then((r) => r.json()),
+        fetch(`/api/candles?tf=${timeframe}&symbol=${symbol}`).then((r) => r.json()),
         fetch(`/api/candles?tf=${timeframe}&symbol=${SP500_SYMBOL}`).then((r) => r.json()),
         fetch(`/api/candles?tf=${timeframe}&symbol=${NASDAQ_SYMBOL}`).then((r) => r.json()),
       ])
@@ -155,7 +155,7 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
         cancelledRef.current = true;
       };
     },
-    [timeframe]
+    [timeframe, symbol]
   );
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- the load flips status to "loading" up front so a timeframe switch shows it immediately
@@ -173,7 +173,7 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
           เทียบกับตลาดรวม <span className="telemetry text-ch-price">· {timeframe}</span>
         </span>
         <div className="flex items-center gap-4 text-[11px]">
-          <Legend label="NVDA" color={CH.price} value={nvdaChange} />
+          <Legend label={symbol} color={CH.price} value={nvdaChange} />
           <Legend label="S&P 500" color={CH.benchmark} value={sp500Change} />
           <Legend label="NASDAQ 100" color={CH.nasdaq} value={nasdaqChange} />
         </div>
@@ -188,7 +188,7 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
       <div ref={containerRef} className="h-60 w-full" />
 
       {status === "ready" && nvdaChange !== null && sp500Change !== null && nasdaqChange !== null && (
-        <ComparisonSummary nvda={nvdaChange} sp500={sp500Change} nasdaq={nasdaqChange} />
+        <ComparisonSummary symbol={symbol} nvda={nvdaChange} sp500={sp500Change} nasdaq={nasdaqChange} />
       )}
     </div>
   );
@@ -202,7 +202,17 @@ function Gap({ diff }: { diff: number }) {
   );
 }
 
-function ComparisonSummary({ nvda, sp500, nasdaq }: { nvda: number; sp500: number; nasdaq: number }) {
+function ComparisonSummary({
+  symbol,
+  nvda,
+  sp500,
+  nasdaq,
+}: {
+  symbol: string;
+  nvda: number;
+  sp500: number;
+  nasdaq: number;
+}) {
   const diffSp = nvda - sp500;
   const diffNq = nvda - nasdaq;
   const sSp = sign(diffSp);
@@ -213,14 +223,14 @@ function ComparisonSummary({ nvda, sp500, nasdaq }: { nvda: number; sp500: numbe
   if (sSp > 0 && sNq > 0) {
     return (
       <p className={wrapperClass}>
-        NVDA ชนะตลาดในช่วงเวลานี้ นำทั้ง S&P 500 อยู่ <Gap diff={diffSp} /> และ NASDAQ 100 อยู่ <Gap diff={diffNq} />
+        {symbol} ชนะตลาดในช่วงเวลานี้ นำทั้ง S&P 500 อยู่ <Gap diff={diffSp} /> และ NASDAQ 100 อยู่ <Gap diff={diffNq} />
       </p>
     );
   }
   if (sSp < 0 && sNq < 0) {
     return (
       <p className={wrapperClass}>
-        NVDA แพ้ตลาดในช่วงเวลานี้ ตามหลังทั้ง S&P 500 อยู่ <Gap diff={diffSp} /> และ NASDAQ 100 อยู่ <Gap diff={diffNq} />
+        {symbol} แพ้ตลาดในช่วงเวลานี้ ตามหลังทั้ง S&P 500 อยู่ <Gap diff={diffSp} /> และ NASDAQ 100 อยู่ <Gap diff={diffNq} />
       </p>
     );
   }
@@ -229,7 +239,7 @@ function ComparisonSummary({ nvda, sp500, nasdaq }: { nvda: number; sp500: numbe
   const nqVerb = sNq > 0 ? "นำ" : sNq < 0 ? "ตามหลัง" : "เท่ากับ";
   return (
     <p className={wrapperClass}>
-      ในกรอบเวลาที่เลือก NVDA {spVerb} S&P 500
+      ในกรอบเวลาที่เลือก {symbol} {spVerb} S&P 500
       {sSp !== 0 && (
         <>
           {" "}

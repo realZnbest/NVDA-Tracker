@@ -36,13 +36,13 @@ function fmtUsd(v: number | null) {
   return `$${v.toFixed(2)}`;
 }
 
-async function buildChatContext(): Promise<string> {
+async function buildChatContext(symbol: string): Promise<string> {
   const parts: string[] = [];
 
   try {
-    const quote = await getQuote(SYMBOL);
+    const quote = await getQuote(symbol);
     parts.push(
-      `ราคาปัจจุบันของ NVDA: $${quote.c.toFixed(2)} (${quote.d >= 0 ? "+" : ""}${quote.d.toFixed(2)}, ${quote.dp.toFixed(2)}%). เปิด $${quote.o.toFixed(2)} สูงสุด $${quote.h.toFixed(2)} ต่ำสุด $${quote.l.toFixed(2)} ปิดก่อนหน้า $${quote.pc.toFixed(2)}`
+      `ราคาปัจจุบันของ ${symbol}: $${quote.c.toFixed(2)} (${quote.d >= 0 ? "+" : ""}${quote.d.toFixed(2)}, ${quote.dp.toFixed(2)}%). เปิด $${quote.o.toFixed(2)} สูงสุด $${quote.h.toFixed(2)} ต่ำสุด $${quote.l.toFixed(2)} ปิดก่อนหน้า $${quote.pc.toFixed(2)}`
     );
   } catch {
     // omit this piece — one data source failing shouldn't block the whole context
@@ -51,19 +51,19 @@ async function buildChatContext(): Promise<string> {
   try {
     const to = new Date();
     const from = new Date(to.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const news = await getCompanyNews(SYMBOL, isoDate(from), isoDate(to));
+    const news = await getCompanyNews(symbol, isoDate(from), isoDate(to));
     const items = filterRelevantNews(news)
       .sort((a, b) => b.datetime - a.datetime)
       .slice(0, 5);
     if (items.length > 0) {
-      parts.push(`ข่าวล่าสุดเกี่ยวกับ NVDA:\n${items.map((n) => `- [${n.source}] ${n.headline}`).join("\n")}`);
+      parts.push(`ข่าวล่าสุดเกี่ยวกับ ${symbol}:\n${items.map((n) => `- [${n.source}] ${n.headline}`).join("\n")}`);
     }
   } catch {
     // omit
   }
 
   try {
-    const read = await getAnalysisRead();
+    const read = await getAnalysisRead(undefined, symbol);
     parts.push(
       `บทวิเคราะห์เชิงเทคนิค (คำนวณจาก RSI/MACD/MA/Bollinger จริง ณ ขณะนี้):\n${read.technical.map((l) => `- ${l}`).join("\n")}`
     );
@@ -76,7 +76,7 @@ async function buildChatContext(): Promise<string> {
   }
 
   try {
-    const reported = await getReportedFinancials(SYMBOL, "quarterly");
+    const reported = await getReportedFinancials(symbol, "quarterly");
     const quarters = extractAllQuarters(reported).slice(-2);
     if (quarters.length > 0) {
       parts.push(
@@ -95,9 +95,9 @@ async function buildChatContext(): Promise<string> {
   const dataBlock = parts.length > 0 ? parts.join("\n\n") : "ไม่มีข้อมูลตลาดล่าสุดในขณะนี้";
 
   return `คุณเป็นนักวิเคราะห์การลงทุนมืออาชีพ ตอบคำถามเป็นภาษาไทยเสมอ น้ำเสียงเป็นทางการ เป็นกลาง ไม่แสดงอารมณ์
-ผู้ใช้อาจถามเกี่ยวกับหุ้น NVIDIA (NVDA) โดยเฉพาะ หรือคำถามทั่วไปเกี่ยวกับการลงทุน/ตลาดหุ้นก็ได้ ตอบได้ทั้งสองแบบ
+ผู้ใช้อาจถามเกี่ยวกับหุ้น ${symbol} โดยเฉพาะ หรือคำถามทั่วไปเกี่ยวกับการลงทุน/ตลาดหุ้นก็ได้ ตอบได้ทั้งสองแบบ
 
-ข้อมูลตลาดล่าสุดของ NVDA ด้านล่างนี้ผ่านการคำนวณไว้ให้แล้ว (ราคา, RSI/MACD/MA/Bollinger จริง, อัตราส่วนการเงินจริง, ข่าวจริง) — เมื่อผู้ใช้ถามคำถามเชิงเทคนิคัลหรือปัจจัยพื้นฐาน ให้ตอบโดยอ้างอิงตัวเลข/บทวิเคราะห์ที่ให้มาโดยตรงทันที ห้ามบอกให้ผู้ใช้ไปดูกราฟหรือตัวเลขเอง เพราะข้อมูลเหล่านั้นถูกคำนวณมาให้พร้อมแล้วในนี้ ห้ามเดาหรือแต่งตัวเลขเพิ่มเติมนอกจากที่ให้มา:
+ข้อมูลตลาดล่าสุดของ ${symbol} ด้านล่างนี้ผ่านการคำนวณไว้ให้แล้ว (ราคา, RSI/MACD/MA/Bollinger จริง, อัตราส่วนการเงินจริง, ข่าวจริง) — เมื่อผู้ใช้ถามคำถามเชิงเทคนิคัลหรือปัจจัยพื้นฐาน ให้ตอบโดยอ้างอิงตัวเลข/บทวิเคราะห์ที่ให้มาโดยตรงทันที ห้ามบอกให้ผู้ใช้ไปดูกราฟหรือตัวเลขเอง เพราะข้อมูลเหล่านั้นถูกคำนวณมาให้พร้อมแล้วในนี้ ห้ามเดาหรือแต่งตัวเลขเพิ่มเติมนอกจากที่ให้มา:
 ${dataBlock}
 
 ห้ามให้คำแนะนำการลงทุนโดยตรง (เช่น ควรซื้อ/ควรขายตอนนี้) ให้นำเสนอข้อมูลและมุมมองประกอบการตัดสินใจแทน ตอบกระชับ ไม่ต้องมีหัวข้อหรือ bullet เว้นแต่จำเป็น`;
@@ -109,7 +109,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
-  const body = (await request.json()) as { messages?: ChatMessage[] };
+  const body = (await request.json()) as { messages?: ChatMessage[]; symbol?: string };
+  const symbol = body.symbol || SYMBOL;
   const messages = Array.isArray(body.messages) ? body.messages : [];
   if (messages.length === 0) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
   const trimmed = messages.slice(-MAX_HISTORY);
 
   try {
-    const context = await buildChatContext();
+    const context = await buildChatContext(symbol);
     const reply = await generateChatReply(trimmed, context);
     return NextResponse.json({ reply });
   } catch {
