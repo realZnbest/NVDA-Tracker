@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getQuote,
   getCompanyNews,
-  getBasicFinancials,
   getReportedFinancials,
 } from "@/lib/finnhub";
 import { extractAllQuarters } from "@/lib/financial-metrics";
 import { generateChatReply, type ChatMessage } from "@/lib/ai-provider";
 import { filterRelevantNews } from "@/lib/news-filter";
 import { SYMBOL } from "@/lib/timeframes";
+import { getAnalysisRead } from "@/lib/analysis";
 
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX = 20;
@@ -63,13 +63,16 @@ async function buildChatContext(): Promise<string> {
   }
 
   try {
-    const basic = await getBasicFinancials(SYMBOL);
-    const m = basic.metric;
+    const read = await getAnalysisRead();
     parts.push(
-      `อัตราส่วนปัจจุบัน: P/E ${m.peNormalizedAnnual ?? m.peTTM ?? "ไม่มีข้อมูล"} เท่า, P/S ${m.psTTM ?? "ไม่มีข้อมูล"} เท่า, รายได้เติบโต YoY ${m.revenueGrowthTTMYoy ?? m.revenueGrowthQuarterlyYoy ?? "ไม่มีข้อมูล"}%`
+      `บทวิเคราะห์เชิงเทคนิค (คำนวณจาก RSI/MACD/MA/Bollinger จริง ณ ขณะนี้):\n${read.technical.map((l) => `- ${l}`).join("\n")}`
     );
+    parts.push(
+      `บทวิเคราะห์ปัจจัยพื้นฐาน (P/E, P/S, อัตรากำไร, การเติบโต):\n${read.fundamental.map((l) => `- ${l}`).join("\n")}`
+    );
+    parts.push(`ภาพรวมสัญญาณ: ${read.verdictText}`);
   } catch {
-    // omit
+    // omit — this piece failing shouldn't block quote/news/reported-financials context
   }
 
   try {
@@ -94,7 +97,7 @@ async function buildChatContext(): Promise<string> {
   return `คุณเป็นนักวิเคราะห์การลงทุนมืออาชีพ ตอบคำถามเป็นภาษาไทยเสมอ น้ำเสียงเป็นทางการ เป็นกลาง ไม่แสดงอารมณ์
 ผู้ใช้อาจถามเกี่ยวกับหุ้น NVIDIA (NVDA) โดยเฉพาะ หรือคำถามทั่วไปเกี่ยวกับการลงทุน/ตลาดหุ้นก็ได้ ตอบได้ทั้งสองแบบ
 
-ข้อมูลตลาดล่าสุดของ NVDA ที่ใช้ประกอบคำตอบเมื่อเกี่ยวข้อง (ห้ามเดาหรือแต่งตัวเลขเพิ่มเติมนอกจากนี้):
+ข้อมูลตลาดล่าสุดของ NVDA ด้านล่างนี้ผ่านการคำนวณไว้ให้แล้ว (ราคา, RSI/MACD/MA/Bollinger จริง, อัตราส่วนการเงินจริง, ข่าวจริง) — เมื่อผู้ใช้ถามคำถามเชิงเทคนิคัลหรือปัจจัยพื้นฐาน ให้ตอบโดยอ้างอิงตัวเลข/บทวิเคราะห์ที่ให้มาโดยตรงทันที ห้ามบอกให้ผู้ใช้ไปดูกราฟหรือตัวเลขเอง เพราะข้อมูลเหล่านั้นถูกคำนวณมาให้พร้อมแล้วในนี้ ห้ามเดาหรือแต่งตัวเลขเพิ่มเติมนอกจากที่ให้มา:
 ${dataBlock}
 
 ห้ามให้คำแนะนำการลงทุนโดยตรง (เช่น ควรซื้อ/ควรขายตอนนี้) ให้นำเสนอข้อมูลและมุมมองประกอบการตัดสินใจแทน ตอบกระชับ ไม่ต้องมีหัวข้อหรือ bullet เว้นแต่จำเป็น`;

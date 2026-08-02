@@ -1,3 +1,10 @@
+import { getBasicFinancials, getQuote } from "./finnhub";
+import { getYahooCandles } from "./yahoo";
+import { SYMBOL } from "./timeframes";
+import { bollinger, ema, lastValid, macd, rsi, sma } from "./indicators";
+
+export class AnalysisDataError extends Error {}
+
 export interface TechnicalInputs {
   price: number;
   rsi: number | null;
@@ -211,4 +218,59 @@ export function synthesize(
   }
 
   return { technical: tech.lines, fundamental: fund.lines, verdict, verdictText };
+}
+
+/**
+ * Fetches live data and runs the rule-based synthesis end to end — the same computation
+ * src/app/api/analysis/route.ts serves to the analysis panel, extracted here so any other
+ * caller (e.g. the chat context builder) gets real computed RSI/MACD/MA readings instead
+ * of duplicating this fetch-and-compute wiring.
+ */
+export async function getAnalysisRead(): Promise<AnalysisRead> {
+  const [candles, quote, financials] = await Promise.all([
+    getYahooCandles(SYMBOL, "2y", "1d"),
+    getQuote(SYMBOL),
+    getBasicFinancials(SYMBOL),
+  ]);
+
+  if (candles.s !== "ok" || candles.c.length < 30) {
+    throw new AnalysisDataError("NO_DATA");
+  }
+
+  const closes = candles.c;
+  const price = quote.c;
+  const rsiSeries = rsi(closes, 14);
+  const macdSeries = macd(closes);
+  const ma20 = sma(closes, 20);
+  const ma50 = ema(closes, 50);
+  const ma200 = ema(closes, 200);
+  const bb = bollinger(closes, 20);
+  const m = financials.metric;
+
+  return synthesize(
+    {
+      price,
+      rsi: lastValid(rsiSeries),
+      macd: lastValid(macdSeries.macd),
+      macdSignal: lastValid(macdSeries.signal),
+      macdHistPrev: macdSeries.histogram[macdSeries.histogram.length - 2] ?? null,
+      macdHistLast: macdSeries.histogram[macdSeries.histogram.length - 1] ?? null,
+      ma20: lastValid(ma20),
+      ma50: lastValid(ma50),
+      ma200: lastValid(ma200),
+      bollingerUpper: lastValid(bb.upper),
+      bollingerLower: lastValid(bb.lower),
+    },
+    {
+      peTTM: m.peNormalizedAnnual ?? m.peTTM ?? null,
+      psTTM: m.psTTM ?? null,
+      netMarginTTM: m.netProfitMarginTTM ?? null,
+      grossMarginTTM: m.grossMarginTTM ?? null,
+      revenueGrowthYoY: m.revenueGrowthTTMYoy ?? m.revenueGrowthQuarterlyYoy ?? null,
+      epsGrowthYoY: m.epsGrowthTTMYoy ?? m.epsGrowthQuarterlyYoy ?? null,
+      week52High: m["52WeekHigh"] ?? null,
+      week52Low: m["52WeekLow"] ?? null,
+      price,
+    }
+  );
 }
