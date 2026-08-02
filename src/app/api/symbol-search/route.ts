@@ -28,8 +28,14 @@ export async function GET(request: NextRequest) {
     // Non-US listings come back with an exchange suffix (e.g. "603020.SS", "2788.T",
     // "PNPL.L") — a plain ticker has none, which is a reliable enough signal to scope
     // this to the US market without a separate exchange lookup.
+    //
+    // Type isn't just "Common Stock": large, well-known foreign companies trade in the US
+    // as ADRs (Taiwan Semiconductor/TSM, Alibaba/BABA, Sony, Novo Nordisk, ...) — Finnhub
+    // tags those "ADR" rather than "Common Stock", so restricting to "Common Stock" alone
+    // silently excluded an entire category of legitimate, commonly-searched US tickers.
+    const ALLOWED_TYPES = new Set(["Common Stock", "ADR"]);
     const results = data.result
-      .filter((r) => r.type === "Common Stock" && !r.symbol.includes("."))
+      .filter((r) => ALLOWED_TYPES.has(r.type) && !r.symbol.includes("."))
       .map((r) => ({ symbol: r.symbol, description: r.description }))
       .sort((a, b) => rank(a.symbol, a.description) - rank(b.symbol, b.description))
       .slice(0, MAX_RESULTS);
