@@ -26,6 +26,8 @@
   --ch-macd-dim: #1f5a49;
   --ch-alert: #ef4a4a;
   --ch-alert-dim: #5c2222;
+  --ch-earnings: #f2994a;
+  --ch-earnings-dim: #5c3d1e;
 
   --up: #34d17c;
   --down: #ef5b5b;
@@ -57,6 +59,8 @@
   --color-ch-macd-dim: var(--ch-macd-dim);
   --color-ch-alert: var(--ch-alert);
   --color-ch-alert-dim: var(--ch-alert-dim);
+  --color-ch-earnings: var(--ch-earnings);
+  --color-ch-earnings-dim: var(--ch-earnings-dim);
 
   --color-up: var(--up);
   --color-down: var(--down);

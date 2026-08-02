@@ -143,3 +143,27 @@ export function getReportedFinancials(symbol: string, freq: "annual" | "quarterl
     60 * 60_000
   );
 }
+
+export interface FinnhubEarningsEvent {
+  symbol: string;
+  date: string;
+  hour: string;
+  quarter: number;
+  year: number;
+  epsEstimate: number | null;
+  epsActual: number | null;
+  revenueEstimate: number | null;
+  revenueActual: number | null;
+}
+
+export interface FinnhubEarningsCalendar {
+  earningsCalendar: FinnhubEarningsEvent[];
+}
+
+export function getEarningsCalendar(symbol: string, from: string, to: string) {
+  return fetchFinnhub<FinnhubEarningsCalendar>(
+    "/calendar/earnings",
+    { symbol, from, to },
+    6 * 60 * 60_000
+  );
+}

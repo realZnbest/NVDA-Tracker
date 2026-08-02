@@ -2,6 +2,7 @@ import { QuoteHeader } from "@/components/quote-header";
 import { PriceChart } from "@/components/price-chart";
 import { AnalysisPanel } from "@/components/analysis-panel";
 import { AnalystPanel } from "@/components/analyst-panel";
+import { EarningsCountdown } from "@/components/earnings-countdown";
 
 export default function DashboardPage() {
   return (
@@ -12,6 +13,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-4">
           <AnalysisPanel />
           <AnalystPanel />
+          <EarningsCountdown />
         </div>
       </div>
     </div>

@@ -1,0 +1,76 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { FinnhubEarningsEvent } from "@/lib/finnhub";
+
+const HOUR_LABEL_TH: Record<string, string> = {
+  bmo: "ก่อนตลาดเปิด",
+  amc: "หลังตลาดปิด",
+  dmh: "ระหว่างตลาดเปิด",
+};
+
+function formatCountdown(targetDate: string, now: number): string {
+  const target = new Date(`${targetDate}T00:00:00`).getTime();
+  const diff = target - now;
+  if (diff <= 0) return "วันนี้";
+  const days = Math.floor(diff / (24 * 60 * 60_000));
+  const hours = Math.floor((diff % (24 * 60 * 60_000)) / (60 * 60_000));
+  if (days === 0) return `อีก ${hours} ชั่วโมง`;
+  return `อีก ${days} วัน ${hours} ชั่วโมง`;
+}
+
+export function EarningsCountdown() {
+  const [event, setEvent] = useState<FinnhubEarningsEvent | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "no_data" | "no_key" | "error">("loading");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    fetch("/api/earnings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error === "MISSING_API_KEY") return setStatus("no_key");
+        if (data.error) return setStatus("error");
+        if (!data.event) return setStatus("no_data");
+        setEvent(data.event);
+        setStatus("ready");
+      })
+      .catch(() => setStatus("error"));
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="module p-4">
+      <div className="module-label mb-2 text-ch-earnings">รายงานผลประกอบการถัดไป</div>
+
+      {status === "loading" && <p className="text-sm text-text-muted">กำลังโหลด…</p>}
+      {status === "no_key" && (
+        <p className="text-sm text-text-muted">ต้องตั้งค่า FINNHUB_API_KEY ก่อนจึงจะดูข้อมูลนี้ได้</p>
+      )}
+      {status === "error" && <p className="text-sm text-text-muted">โหลดข้อมูลไม่สำเร็จ</p>}
+      {status === "no_data" && <p className="text-sm text-text-muted">ไม่มีข้อมูล</p>}
+
+      {status === "ready" && event && (
+        <div className="flex flex-col gap-1">
+          <span className="telemetry text-2xl font-medium text-ch-earnings">
+            {formatCountdown(event.date, now)}
+          </span>
+          <span className="telemetry text-xs text-text-secondary">
+            {new Date(`${event.date}T00:00:00`).toLocaleDateString("th-TH", {
+              dateStyle: "long",
+            })}
+            {event.hour && HOUR_LABEL_TH[event.hour] && ` · ${HOUR_LABEL_TH[event.hour]}`}
+          </span>
+          {event.epsEstimate !== null && (
+            <span className="telemetry text-[10px] text-text-muted mt-1">
+              คาด EPS {event.epsEstimate.toFixed(2)}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
