@@ -150,7 +150,9 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
   return (
     <div className="module flex flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-seam px-4 py-2.5">
-        <span className="module-label">เทียบกับตลาดรวม</span>
+        <span className="module-label">
+          เทียบกับตลาดรวม <span className="telemetry text-ch-price">· {timeframe}</span>
+        </span>
         <div className="flex items-center gap-4 text-[11px]">
           <Legend label="NVDA" color={CH.price} value={nvdaChange} />
           <Legend label="S&P 500" color={CH.benchmark} value={sp500Change} />
