@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
 import { IconBell, IconLedger, IconSignal, IconWallet, IconWave } from "./icons";
@@ -18,11 +18,32 @@ const NAV_ITEMS = [
   { href: "/alerts", label: "การแจ้งเตือน", icon: IconBell, symbolAware: false },
 ] as const;
 
+const LAST_SYMBOL_KEY = "nvda-tracker.last-symbol";
+
 export function RackNav() {
   const pathname = usePathname();
   const router = useRouter();
   const params = useParams<{ symbol?: string }>();
-  const activeSymbol = params?.symbol;
+  const urlSymbol = params?.symbol;
+  // /portfolio and /alerts have no [symbol] segment, so urlSymbol goes undefined while
+  // viewing them — that must NOT erase which symbol the user was last looking at on
+  // Dashboard/News/Financials. Track it separately, backed by localStorage so it also
+  // survives a full page reload, not just client-side navigation.
+  const [lastSymbol, setLastSymbol] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (urlSymbol) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror the URL's symbol into cross-page state
+      setLastSymbol(urlSymbol);
+      localStorage.setItem(LAST_SYMBOL_KEY, urlSymbol);
+    } else if (lastSymbol === undefined) {
+      const stored = localStorage.getItem(LAST_SYMBOL_KEY);
+      if (stored) setLastSymbol(stored);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL symbol changes; lastSymbol is read, not a trigger
+  }, [urlSymbol]);
+
+  const activeSymbol = urlSymbol ?? lastSymbol;
   const [query, setQuery] = useState("");
 
   function handleSelect(result: SymbolSearchResult) {
