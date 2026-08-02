@@ -7,7 +7,14 @@ import { useAlertsContext } from "./alerts-provider";
 import { AlertsPasswordGate } from "./alerts-password-gate";
 
 function toDateInputValue(ts: number): string {
-  return new Date(ts).toISOString().slice(0, 10);
+  // Use local calendar fields, not toISOString() (UTC) — fromDateInputValue below
+  // constructs the timestamp at local midnight, so converting back via UTC would
+  // shift the date by a day for any timezone ahead of UTC (e.g. Thailand, UTC+7).
+  const d = new Date(ts);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function fromDateInputValue(value: string): number {
@@ -141,7 +148,7 @@ export function PositionPanel() {
             type="date"
             value={purchaseDate}
             onChange={(e) => setPurchaseDate(e.target.value)}
-            className="telemetry w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-auto"
+            className="w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-auto"
             required
           />
         </div>
@@ -202,7 +209,7 @@ export function PositionPanel() {
                     type="date"
                     value={editDate}
                     onChange={(e) => setEditDate(e.target.value)}
-                    className="telemetry rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
+                    className="rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
                   />
                   <input
                     type="number"
