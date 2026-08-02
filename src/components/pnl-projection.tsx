@@ -10,13 +10,17 @@ import {
 import { IconPlus, IconTrash } from "./icons";
 import { useAlertsContext } from "./alerts-provider";
 
-const TARGETS_STORAGE_KEY = "nvda-pnl-targets";
+// NVDA keeps its original flat key so existing saved targets carry over unchanged;
+// every other symbol gets its own key so target lists don't bleed across symbols.
+function targetsStorageKey(symbol: string): string {
+  return symbol === "NVDA" ? "nvda-pnl-targets" : `pnl-targets:${symbol}`;
+}
 
 function defaultTargets(price: number): number[] {
   return [Math.round(price * 1.1), Math.round(price * 1.25), Math.round(price * 1.5)];
 }
 
-export function PnlProjectionPanel() {
+export function PnlProjectionPanel({ symbol = "NVDA" }: { symbol?: string }) {
   const { authStatus } = useAlertsContext();
   const [aggregate, setAggregate] = useState<AggregatePosition | null>(null);
   const [price, setPrice] = useState<number | null>(null);
@@ -27,8 +31,8 @@ export function PnlProjectionPanel() {
   useEffect(() => {
     if (authStatus !== "authenticated") return;
     Promise.all([
-      fetch("/api/position").then((r) => r.json()),
-      fetch("/api/quote").then((r) => r.json()),
+      fetch(`/api/position?symbol=${symbol}`).then((r) => r.json()),
+      fetch(`/api/quote?symbol=${symbol}`).then((r) => r.json()),
     ])
       .then(([positionData, quoteData]) => {
         const agg = computeAggregatePosition((positionData.lots ?? []) as PositionLot[]);
@@ -36,23 +40,26 @@ export function PnlProjectionPanel() {
         if (quoteData.quote) setPrice(quoteData.quote.c);
       })
       .catch(() => {});
-  }, [authStatus]);
+  }, [authStatus, symbol]);
 
   // Target prices are saved to localStorage (client-side, not server state), so a page
   // refresh — or a Render redeploy, which only ever affects the server — never loses them.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when switching symbols so stale targets don't flash
+    setTargetsLoaded(false);
     try {
-      const raw = localStorage.getItem(TARGETS_STORAGE_KEY);
+      const raw = localStorage.getItem(targetsStorageKey(symbol));
       const parsed = raw ? JSON.parse(raw) : null;
       if (Array.isArray(parsed) && parsed.every((n) => typeof n === "number")) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore from storage on mount
         setTargets(parsed);
+      } else {
+        setTargets([]);
       }
     } catch {
-      // corrupt/blocked storage — fall back to defaults below
+      setTargets([]);
     }
     setTargetsLoaded(true);
-  }, []);
+  }, [symbol]);
 
   useEffect(() => {
     if (price === null || !targetsLoaded) return;
@@ -62,8 +69,8 @@ export function PnlProjectionPanel() {
 
   useEffect(() => {
     if (!targetsLoaded) return;
-    localStorage.setItem(TARGETS_STORAGE_KEY, JSON.stringify(targets));
-  }, [targets, targetsLoaded]);
+    localStorage.setItem(targetsStorageKey(symbol), JSON.stringify(targets));
+  }, [targets, targetsLoaded, symbol]);
 
   if (authStatus !== "authenticated" || !aggregate || price === null) {
     return null;

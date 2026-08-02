@@ -1,14 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getQuote, FinnhubError } from "@/lib/finnhub";
 import { getExtendedHoursQuote } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const symbol = request.nextUrl.searchParams.get("symbol") ?? SYMBOL;
   try {
-    const quote = await getQuote(SYMBOL);
+    const quote = await getQuote(symbol);
     let extended: Awaited<ReturnType<typeof getExtendedHoursQuote>> | null = null;
     try {
-      extended = await getExtendedHoursQuote(SYMBOL);
+      extended = await getExtendedHoursQuote(symbol);
     } catch {
       // extended-hours data is best-effort; the regular quote still stands without it
     }

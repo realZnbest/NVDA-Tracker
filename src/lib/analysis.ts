@@ -236,14 +236,17 @@ export function synthesize(
  * MACD don't carry that same fixed-period convention, so they follow whatever `timeframe`
  * the caller is currently looking at (matches the price chart's own selected tab).
  */
-export async function getAnalysisRead(timeframe: TimeframeKey = "1H"): Promise<AnalysisRead> {
+export async function getAnalysisRead(
+  timeframe: TimeframeKey = "1H",
+  symbol: string = SYMBOL
+): Promise<AnalysisRead> {
   const tf = TIMEFRAMES.find((t) => t.key === timeframe) ?? TIMEFRAMES.find((t) => t.key === "1H")!;
 
   const [dailyCandles, tfCandles, quote, financials] = await Promise.all([
-    getYahooCandles(SYMBOL, "2y", "1d"),
-    getYahooCandles(SYMBOL, tf.yahooRange, tf.yahooInterval),
-    getQuote(SYMBOL),
-    getBasicFinancials(SYMBOL),
+    getYahooCandles(symbol, "2y", "1d"),
+    getYahooCandles(symbol, tf.yahooRange, tf.yahooInterval),
+    getQuote(symbol),
+    getBasicFinancials(symbol),
   ]);
 
   if (dailyCandles.s !== "ok" || dailyCandles.c.length < 30 || tfCandles.s !== "ok" || tfCandles.c.length < 30) {

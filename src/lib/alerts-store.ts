@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "./db";
-import type { Alert, AlertNotification, AlertType } from "./types";
+import { PORTFOLIO_ALERT_TYPES, type Alert, type AlertNotification, type AlertType } from "./types";
 
 interface AlertRow {
   id: string;
+  symbol: string | null;
   type: AlertType;
   label: string;
   threshold: number | null;
@@ -18,22 +19,37 @@ function rowToAlert(row: AlertRow): Alert {
   return { ...row, active: row.active === 1 };
 }
 
-export async function listAlerts(): Promise<Alert[]> {
+/** Omit `symbol` for all alerts (grouped view); pass it to filter to one symbol's alerts. */
+export async function listAlerts(symbol?: string): Promise<Alert[]> {
   const db = await getDb();
-  const result = await db.execute(`SELECT * FROM alerts ORDER BY createdAt DESC`);
+  const result = symbol
+    ? await db.execute({
+        sql: `SELECT * FROM alerts WHERE symbol = ? ORDER BY createdAt DESC`,
+        args: [symbol],
+      })
+    : await db.execute(`SELECT * FROM alerts ORDER BY createdAt DESC`);
+  return (result.rows as unknown as AlertRow[]).map(rowToAlert);
+}
+
+export async function listPortfolioAlerts(): Promise<Alert[]> {
+  const db = await getDb();
+  const result = await db.execute(`SELECT * FROM alerts WHERE symbol IS NULL ORDER BY createdAt DESC`);
   return (result.rows as unknown as AlertRow[]).map(rowToAlert);
 }
 
 export async function createAlert(input: {
   type: AlertType;
   label: string;
+  symbol?: string | null;
   threshold?: number | null;
   fastPeriod?: number | null;
   slowPeriod?: number | null;
 }): Promise<Alert> {
   const db = await getDb();
+  const isPortfolioWide = PORTFOLIO_ALERT_TYPES.includes(input.type);
   const row: AlertRow = {
     id: randomUUID(),
+    symbol: isPortfolioWide ? null : (input.symbol ?? null),
     type: input.type,
     label: input.label,
     threshold: input.threshold ?? null,
@@ -43,11 +59,15 @@ export async function createAlert(input: {
     createdAt: Date.now(),
     lastTriggeredAt: null,
   };
+  if (!isPortfolioWide && !row.symbol) {
+    throw new Error("SYMBOL_REQUIRED");
+  }
   await db.execute({
-    sql: `INSERT INTO alerts (id, type, label, threshold, fastPeriod, slowPeriod, active, createdAt, lastTriggeredAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO alerts (id, symbol, type, label, threshold, fastPeriod, slowPeriod, active, createdAt, lastTriggeredAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       row.id,
+      row.symbol,
       row.type,
       row.label,
       row.threshold,

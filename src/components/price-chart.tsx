@@ -98,11 +98,12 @@ const DEFAULT_LAYERS: Layers = {
 const REFRESH_INTERVAL_MS = 60_000;
 
 interface PriceChartProps {
+  symbol?: string;
   timeframe: TimeframeKey;
   onTimeframeChange: (tf: TimeframeKey) => void;
 }
 
-export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
+export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick" | "Line" | "Histogram">>>({});
@@ -154,7 +155,7 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
       return;
     }
     let cancelled = false;
-    fetch("/api/position")
+    fetch(`/api/position?symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -165,7 +166,7 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
     return () => {
       cancelled = true;
     };
-  }, [authStatus]);
+  }, [authStatus, symbol]);
 
   // A timeframe switch is a visible load; the periodic refresh below is silent — it must
   // not flash the "กำลังโหลด" overlay over a chart the owner is already reading, and a
@@ -174,7 +175,7 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
     (mode: "initial" | "refresh") => {
       const cancelledRef = { current: false };
       if (mode === "initial") setStatus("loading");
-      fetch(`/api/candles?tf=${timeframe}`)
+      fetch(`/api/candles?tf=${timeframe}&symbol=${symbol}`)
         .then((r) => r.json())
         .then((data) => {
           if (cancelledRef.current) return;
@@ -197,7 +198,7 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
         cancelledRef.current = true;
       };
     },
-    [timeframe]
+    [timeframe, symbol]
   );
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- the load flips status to "loading" up front so the timeframe switch shows an overlay immediately

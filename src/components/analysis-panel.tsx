@@ -13,7 +13,7 @@ const VERDICT_TH: Record<AnalysisRead["verdict"], { label: string; color: string
   mixed: { label: "สัญญาณผสม", color: "var(--ch-price)" },
 };
 
-export function AnalysisPanel({ timeframe }: { timeframe: TimeframeKey }) {
+export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string; timeframe: TimeframeKey }) {
   const { authStatus } = useAlertsContext();
   const [read, setRead] = useState<AnalysisRead | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
@@ -23,7 +23,7 @@ export function AnalysisPanel({ timeframe }: { timeframe: TimeframeKey }) {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the timeframe changes
     setStatus("loading");
-    fetch(`/api/analysis?tf=${timeframe}`)
+    fetch(`/api/analysis?tf=${timeframe}&symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -36,10 +36,12 @@ export function AnalysisPanel({ timeframe }: { timeframe: TimeframeKey }) {
     return () => {
       cancelled = true;
     };
-  }, [timeframe]);
+  }, [timeframe, symbol]);
 
   // Position data is private — only fetched/rendered for an authenticated owner session,
-  // even though this panel itself renders on the public dashboard.
+  // even though this panel itself renders on the public dashboard. Scoped to the symbol
+  // being viewed — if the owner has no position in this symbol, the line stays null and
+  // simply doesn't render, same graceful-absence pattern as an unauthenticated visitor.
   useEffect(() => {
     if (authStatus !== "authenticated") {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clear private data on logout
@@ -48,13 +50,13 @@ export function AnalysisPanel({ timeframe }: { timeframe: TimeframeKey }) {
     }
     let cancelled = false;
     Promise.all([
-      fetch("/api/position").then((r) => r.json()),
-      fetch("/api/quote").then((r) => r.json()),
+      fetch(`/api/position?symbol=${symbol}`).then((r) => r.json()),
+      fetch(`/api/quote?symbol=${symbol}`).then((r) => r.json()),
     ])
       .then(([positionData, quoteData]) => {
         if (cancelled) return;
         const aggregate = computeAggregatePosition((positionData.lots ?? []) as PositionLot[]);
-        if (!aggregate || !quoteData.quote) return;
+        if (!aggregate || !quoteData.quote) return setPositionLine(null);
         const metrics = computePositionMetrics(aggregate, quoteData.quote.c);
         const sign = metrics.unrealizedPnl >= 0 ? "+" : "";
         setPositionLine(
@@ -65,7 +67,7 @@ export function AnalysisPanel({ timeframe }: { timeframe: TimeframeKey }) {
     return () => {
       cancelled = true;
     };
-  }, [authStatus]);
+  }, [authStatus, symbol]);
 
   return (
     <div className="module p-4">

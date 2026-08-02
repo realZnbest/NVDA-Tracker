@@ -26,13 +26,13 @@ const SESSION_GLOW: Record<ExtendedHoursQuote["session"], string> = {
   closed: "transparent",
 };
 
-export function QuoteHeader() {
+export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
   const [quote, setQuote] = useState<FinnhubQuote | null>(null);
   const [extended, setExtended] = useState<ExtendedHoursQuote | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
 
   const load = useCallback(() => {
-    fetch("/api/quote")
+    fetch(`/api/quote?symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error === "MISSING_API_KEY") return setStatus("no_key");
@@ -42,7 +42,7 @@ export function QuoteHeader() {
         setStatus("ready");
       })
       .catch(() => setStatus("error"));
-  }, []);
+  }, [symbol]);
 
   usePoll(load, 20_000);
 
@@ -62,10 +62,10 @@ export function QuoteHeader() {
       <div className="w-full sm:w-auto">
         <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 mb-2">
           <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">
-            NVIDIA CORPORATION
+            {symbol === "NVDA" ? "NVIDIA CORPORATION" : symbol}
           </h1>
           <span className="telemetry rounded px-2 py-0.5 text-[11px] bg-ch-price-dim text-ch-price whitespace-nowrap">
-            NASDAQ · NVDA
+            NASDAQ · {symbol}
           </span>
           <NotificationBell className="ml-auto sm:hidden" />
         </div>

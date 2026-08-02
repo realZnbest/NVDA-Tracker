@@ -5,6 +5,24 @@ declare global {
   var __nvdaTursoInitialized: boolean | undefined;
 }
 
+/**
+ * libSQL has no `ADD COLUMN IF NOT EXISTS` — check `PRAGMA table_info` first so re-running
+ * this on a DB that already has the column (every deploy after the first) is a no-op
+ * instead of an error.
+ */
+async function addColumnIfMissing(
+  db: Client,
+  table: string,
+  column: string,
+  definition: string
+): Promise<void> {
+  const info = await db.execute(`PRAGMA table_info(${table})`);
+  const exists = info.rows.some((row) => (row as unknown as { name: string }).name === column);
+  if (!exists) {
+    await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 function createTursoClient(): Client {
   const url = process.env.TURSO_DATABASE_URL;
   const authToken = process.env.TURSO_AUTH_TOKEN;
@@ -57,6 +75,12 @@ export async function getDb(): Promise<Client> {
         createdAt INTEGER NOT NULL
       )
     `);
+    await addColumnIfMissing(globalThis.__nvdaTurso, "position_lots", "symbol", "TEXT NOT NULL DEFAULT 'NVDA'");
+    await addColumnIfMissing(globalThis.__nvdaTurso, "alerts", "symbol", "TEXT");
+    // Backfill pre-migration alerts: everything used to implicitly mean NVDA, including
+    // pnl_percent_* — those become portfolio-wide only when the owner explicitly creates
+    // a new portfolio_pnl_percent_* alert, so existing rows keep their old (NVDA) meaning.
+    await globalThis.__nvdaTurso.execute(`UPDATE alerts SET symbol = 'NVDA' WHERE symbol IS NULL AND type != 'portfolio_pnl_percent_above' AND type != 'portfolio_pnl_percent_below'`);
     globalThis.__nvdaTursoInitialized = true;
   }
   return globalThis.__nvdaTurso;

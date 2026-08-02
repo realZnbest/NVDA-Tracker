@@ -30,7 +30,7 @@ function parseDisplayDate(value: string): number | null {
   return d.getTime();
 }
 
-export function PositionPanel() {
+export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
   const { authStatus, logout } = useAlertsContext();
   const [lots, setLots] = useState<PositionLot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +48,7 @@ export function PositionPanel() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const refresh = () =>
-    fetch("/api/position")
+    fetch(`/api/position?symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => setLots(data.lots ?? []))
       .finally(() => setLoading(false));
@@ -60,14 +60,17 @@ export function PositionPanel() {
 
   useEffect(() => {
     if (authStatus !== "authenticated") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- show the loading state immediately when switching symbols
+    setLoading(true);
     refresh();
-    fetch("/api/quote")
+    fetch(`/api/quote?symbol=${symbol}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.quote) setPrice(data.quote.c);
       })
       .catch(() => {});
-  }, [authStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh closes over symbol already
+  }, [authStatus, symbol]);
 
   if (authStatus === "checking") {
     return <p className="text-sm text-text-muted">กำลังตรวจสอบสิทธิ์…</p>;
@@ -97,6 +100,7 @@ export function PositionPanel() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        symbol,
         purchaseDate: parsedDate,
         shares: Number(shares),
         pricePerShare: Number(pricePerShare),

@@ -1,5 +1,6 @@
 export interface PositionLot {
   id: string;
+  symbol: string;
   purchaseDate: number;
   shares: number;
   pricePerShare: number;
@@ -33,6 +34,24 @@ export function computeAggregatePosition(lots: PositionLot[]): AggregatePosition
     totalShares,
     earliestDate,
   };
+}
+
+/** Groups lots by symbol and computes each symbol's aggregate independently. */
+export function computeAggregatePositionsBySymbol(
+  lots: PositionLot[]
+): Map<string, AggregatePosition> {
+  const bySymbol = new Map<string, PositionLot[]>();
+  for (const lot of lots) {
+    const group = bySymbol.get(lot.symbol);
+    if (group) group.push(lot);
+    else bySymbol.set(lot.symbol, [lot]);
+  }
+  const result = new Map<string, AggregatePosition>();
+  for (const [symbol, symbolLots] of bySymbol) {
+    const aggregate = computeAggregatePosition(symbolLots);
+    if (aggregate) result.set(symbol, aggregate);
+  }
+  return result;
 }
 
 export function computePositionMetrics(

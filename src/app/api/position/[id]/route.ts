@@ -10,10 +10,14 @@ export async function PATCH(
   if (unauth) return unauth;
   const { id } = await ctx.params;
   const body = (await request.json()) as Partial<{
+    symbol: string;
     purchaseDate: number;
     shares: number;
     pricePerShare: number;
   }>;
+  if (body.symbol !== undefined) {
+    body.symbol = body.symbol.toUpperCase();
+  }
   if (body.shares !== undefined && body.shares <= 0) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
   }

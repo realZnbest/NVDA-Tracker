@@ -8,10 +8,19 @@ export type AlertType =
   | "ma_golden_cross"
   | "ma_death_cross"
   | "pnl_percent_above"
-  | "pnl_percent_below";
+  | "pnl_percent_below"
+  | "portfolio_pnl_percent_above"
+  | "portfolio_pnl_percent_below";
+
+export const PORTFOLIO_ALERT_TYPES: AlertType[] = [
+  "portfolio_pnl_percent_above",
+  "portfolio_pnl_percent_below",
+];
 
 export interface Alert {
   id: string;
+  /** null only for portfolio-wide alert types — every per-symbol alert has a symbol. */
+  symbol: string | null;
   type: AlertType;
   label: string;
   threshold: number | null;
@@ -39,6 +48,8 @@ export const ALERT_TYPE_LABEL_TH: Record<AlertType, string> = {
   macd_bearish_cross: "MACD ตัดลง (สัญญาณขาลง)",
   ma_golden_cross: "Golden Cross (MA เร็วตัดขึ้นเหนือ MA ช้า)",
   ma_death_cross: "Death Cross (MA เร็วตัดลงใต้ MA ช้า)",
-  pnl_percent_above: "พอร์ตกำไรถึง (%)",
-  pnl_percent_below: "พอร์ตขาดทุนถึง (%)",
+  pnl_percent_above: "กำไรถึง (%)",
+  pnl_percent_below: "ขาดทุนถึง (%)",
+  portfolio_pnl_percent_above: "พอร์ตรวมกำไรถึง (%)",
+  portfolio_pnl_percent_below: "พอร์ตรวมขาดทุนถึง (%)",
 };
