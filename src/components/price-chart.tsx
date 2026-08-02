@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   createSeriesMarkers,
@@ -11,6 +11,7 @@ import {
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
+  type MouseEventParams,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
@@ -28,6 +29,8 @@ import {
 } from "@/lib/indicators";
 import type { FinnhubCandles } from "@/lib/finnhub";
 import { computeAggregatePosition } from "@/lib/position";
+import { usePersistentState } from "@/lib/use-persistent-state";
+import { usePoll } from "@/lib/use-poll";
 import { useAlertsContext } from "./alerts-provider";
 
 const CH = {
@@ -65,6 +68,35 @@ const DEFAULT_PARAMS: Params = {
   swingBars: 5,
 };
 
+/** Every toggle/period the owner can set, persisted as one workspace blob. */
+interface Layers {
+  ma1: boolean;
+  ma2: boolean;
+  ma3: boolean;
+  bollinger: boolean;
+  rsi: boolean;
+  rsiMa: boolean;
+  macd: boolean;
+  sr: boolean;
+  structure: boolean;
+}
+
+const DEFAULT_LAYERS: Layers = {
+  ma1: true,
+  ma2: true,
+  ma3: false,
+  bollinger: false,
+  rsi: true,
+  rsiMa: true,
+  macd: true,
+  sr: true,
+  structure: true,
+};
+
+/** Candles are re-pulled on this cadence while the tab is visible, so an open dashboard
+ *  keeps tracking the live bar instead of freezing at whatever it loaded on arrival. */
+const REFRESH_INTERVAL_MS = 60_000;
+
 interface PriceChartProps {
   timeframe: TimeframeKey;
   onTimeframeChange: (tf: TimeframeKey) => void;
@@ -77,23 +109,41 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
   const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
   const srLinesRef = useRef<IPriceLine[]>([]);
   const breakEvenLineRef = useRef<IPriceLine | null>(null);
+  /** Timeframe whose default view has already been applied — see the scoping effect. */
+  const scopedRef = useRef<TimeframeKey | null>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   const { authStatus } = useAlertsContext();
   const [avgCost, setAvgCost] = useState<number | null>(null);
 
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
-  const [params, setParams] = useState<Params>(DEFAULT_PARAMS);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [storedParams, setParams] = usePersistentState<Params>("nvda.chart.params", DEFAULT_PARAMS);
+  const [storedLayers, setLayers] = usePersistentState<Layers>("nvda.chart.layers", DEFAULT_LAYERS);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const [showMa1, setShowMa1] = useState(true);
-  const [showMa2, setShowMa2] = useState(true);
-  const [showMa3, setShowMa3] = useState(false);
-  const [showBollinger, setShowBollinger] = useState(false);
-  const [showRsi, setShowRsi] = useState(true);
-  const [showRsiMa, setShowRsiMa] = useState(true);
-  const [showMacd, setShowMacd] = useState(true);
-  const [showSR, setShowSR] = useState(true);
-  const [showStructure, setShowStructure] = useState(true);
+  // Restored workspaces are merged over the defaults, so a blob written by an older
+  // build (missing a key added since) can't leave a toggle or period undefined.
+  const params = useMemo(() => ({ ...DEFAULT_PARAMS, ...storedParams }), [storedParams]);
+  const layers = useMemo(() => ({ ...DEFAULT_LAYERS, ...storedLayers }), [storedLayers]);
+
+  const {
+    ma1: showMa1,
+    ma2: showMa2,
+    ma3: showMa3,
+    bollinger: showBollinger,
+    rsi: showRsi,
+    rsiMa: showRsiMa,
+    macd: showMacd,
+    sr: showSR,
+    structure: showStructure,
+  } = layers;
+  const toggleLayer = useCallback(
+    (name: keyof Layers) => setLayers((prev) => ({ ...prev, [name]: !prev[name] })),
+    [setLayers]
+  );
 
   // Break-even line is private (the owner's own cost basis) — only fetched/drawn for an
   // authenticated owner session, even though this chart itself renders on the public dashboard.
@@ -117,30 +167,46 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
     };
   }, [authStatus]);
 
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the timeframe changes
-    setStatus("loading");
-    fetch(`/api/candles?tf=${timeframe}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.error === "MISSING_API_KEY") {
-          setStatus("no_key");
-          return;
-        }
-        if (data.error || !data.candles) {
-          setStatus("error");
-          return;
-        }
-        setCandles(data.candles);
-        setStatus("ready");
-      })
-      .catch(() => !cancelled && setStatus("error"));
-    return () => {
-      cancelled = true;
-    };
-  }, [timeframe]);
+  // A timeframe switch is a visible load; the periodic refresh below is silent — it must
+  // not flash the "กำลังโหลด" overlay over a chart the owner is already reading, and a
+  // transient network blip on refresh shouldn't blank out good data either.
+  const loadCandles = useCallback(
+    (mode: "initial" | "refresh") => {
+      const cancelledRef = { current: false };
+      if (mode === "initial") setStatus("loading");
+      fetch(`/api/candles?tf=${timeframe}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (cancelledRef.current) return;
+          if (data.error === "MISSING_API_KEY") {
+            if (mode === "initial") setStatus("no_key");
+            return;
+          }
+          if (data.error || !data.candles) {
+            if (mode === "initial") setStatus("error");
+            return;
+          }
+          setCandles(data.candles);
+          setUpdatedAt(Date.now());
+          setStatus("ready");
+        })
+        .catch(() => {
+          if (!cancelledRef.current && mode === "initial") setStatus("error");
+        });
+      return () => {
+        cancelledRef.current = true;
+      };
+    },
+    [timeframe]
+  );
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- the load flips status to "loading" up front so the timeframe switch shows an overlay immediately
+  useEffect(() => loadCandles("initial"), [loadCandles]);
+
+  const refresh = useCallback(() => {
+    loadCandles("refresh");
+  }, [loadCandles]);
+  usePoll(refresh, REFRESH_INTERVAL_MS, { leading: false });
 
   const computed = useMemo(() => {
     if (!candles) return null;
@@ -393,10 +459,16 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
   // Scope the default view to what the selected tab means (e.g. "1D" opens on the last
   // day) without discarding the rest of the fetched history — zooming/panning out still
   // reveals everything the fetch above pulled in, all the way back to IPO where available.
+  //
+  // Scoping runs once per timeframe selection, never on the periodic refresh — snapping
+  // the view back every minute would fight the owner every time they zoomed in on
+  // something.
   useEffect(() => {
     if (!candles || !chartRef.current) return;
     const times = candles.t;
     if (times.length === 0) return;
+    if (scopedRef.current === timeframe) return;
+    scopedRef.current = timeframe;
 
     const tf = TIMEFRAMES.find((t) => t.key === timeframe);
     const lastTime = times[times.length - 1];
@@ -415,6 +487,75 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
       to: lastTime as UTCTimestamp,
     });
   }, [candles, timeframe]);
+
+  // Crosshair readout: the bar under the cursor, falling back to the most recent bar when
+  // the pointer is off the chart — so the strip always reads something, the way a real
+  // instrument's digital readout always shows the live value until you probe elsewhere.
+  const timeIndex = useMemo(() => {
+    if (!candles) return null;
+    const map = new Map<number, number>();
+    candles.t.forEach((t, i) => map.set(t, i));
+    return map;
+  }, [candles]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !timeIndex) return;
+    const handler = (param: MouseEventParams) => {
+      const time = param.time as number | undefined;
+      if (time === undefined || !param.point) {
+        setHoverIndex(null);
+        return;
+      }
+      setHoverIndex(timeIndex.get(time) ?? null);
+    };
+    chart.subscribeCrosshairMove(handler);
+    return () => chart.unsubscribeCrosshairMove(handler);
+  }, [timeIndex]);
+
+  const readout = useMemo(() => {
+    if (!candles || candles.t.length === 0) return null;
+    const i =
+      hoverIndex !== null && hoverIndex >= 0 && hoverIndex < candles.t.length
+        ? hoverIndex
+        : candles.t.length - 1;
+    const prevClose = i > 0 ? candles.c[i - 1] : candles.o[i];
+    const change = candles.c[i] - prevClose;
+    return {
+      live: hoverIndex === null,
+      time: candles.t[i],
+      open: candles.o[i],
+      high: candles.h[i],
+      low: candles.l[i],
+      close: candles.c[i],
+      volume: candles.v[i],
+      change,
+      changePercent: prevClose === 0 ? 0 : (change / prevClose) * 100,
+      rsi: computed?.rsi[i] ?? null,
+      macd: computed?.macd.macd[i] ?? null,
+    };
+  }, [candles, computed, hoverIndex]);
+
+  // The indicator-parameter popover is a floating panel over the chart; leaving it open
+  // when the owner's attention has clearly moved on (click elsewhere, Esc) just covers
+  // price action they're trying to read.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSettingsOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [settingsOpen]);
 
   const panesVisible = 2 + (showRsi ? 1 : 0) + (showMacd ? 1 : 0);
 
@@ -438,30 +579,80 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-[11px]">
-          <Toggle label={`MA${params.ma1}`} color={CH.price} active={showMa1} onClick={() => setShowMa1((v) => !v)} />
-          <Toggle label={`MA${params.ma2}`} color="#8fb8ff" active={showMa2} onClick={() => setShowMa2((v) => !v)} />
-          <Toggle label={`MA${params.ma3}`} color="#ff9f6e" active={showMa3} onClick={() => setShowMa3((v) => !v)} />
-          <Toggle label="Bollinger" color="#9aa4b2" active={showBollinger} onClick={() => setShowBollinger((v) => !v)} />
-          <Toggle label={`RSI ${params.rsiPeriod}`} color={CH.rsi} active={showRsi} onClick={() => setShowRsi((v) => !v)} />
-          <Toggle label={`RSI MA${params.rsiMaPeriod}`} color={CH.rsiMa} active={showRsiMa} onClick={() => setShowRsiMa((v) => !v)} />
-          <Toggle label="MACD" color={CH.macd} active={showMacd} onClick={() => setShowMacd((v) => !v)} />
-          <Toggle label="แนวรับ/แนวต้าน" color="#9aa4b2" active={showSR} onClick={() => setShowSR((v) => !v)} />
-          <Toggle label="BOS/CHoCH" color={CH.choch} active={showStructure} onClick={() => setShowStructure((v) => !v)} />
+          <Toggle label={`MA${params.ma1}`} color={CH.price} active={showMa1} onClick={() => toggleLayer("ma1")} />
+          <Toggle label={`MA${params.ma2}`} color="#8fb8ff" active={showMa2} onClick={() => toggleLayer("ma2")} />
+          <Toggle label={`MA${params.ma3}`} color="#ff9f6e" active={showMa3} onClick={() => toggleLayer("ma3")} />
+          <Toggle label="Bollinger" color="#9aa4b2" active={showBollinger} onClick={() => toggleLayer("bollinger")} />
+          <Toggle label={`RSI ${params.rsiPeriod}`} color={CH.rsi} active={showRsi} onClick={() => toggleLayer("rsi")} />
+          <Toggle label={`RSI MA${params.rsiMaPeriod}`} color={CH.rsiMa} active={showRsiMa} onClick={() => toggleLayer("rsiMa")} />
+          <Toggle label="MACD" color={CH.macd} active={showMacd} onClick={() => toggleLayer("macd")} />
+          <Toggle label="แนวรับ/แนวต้าน" color="#9aa4b2" active={showSR} onClick={() => toggleLayer("sr")} />
+          <Toggle label="BOS/CHoCH" color={CH.choch} active={showStructure} onClick={() => toggleLayer("structure")} />
         </div>
 
-        <details className="ml-auto text-[11px] text-text-muted">
-          <summary className="cursor-pointer select-none hover:text-text-secondary">ตัวชี้วัด</summary>
-          <div className="absolute right-4 mt-2 module p-3 flex flex-col gap-2 z-30">
-            <ParamField label="MA เร็ว" value={params.ma1} onChange={(v) => setParams((p) => ({ ...p, ma1: v }))} />
-            <ParamField label="MA กลาง" value={params.ma2} onChange={(v) => setParams((p) => ({ ...p, ma2: v }))} />
-            <ParamField label="MA ช้า" value={params.ma3} onChange={(v) => setParams((p) => ({ ...p, ma3: v }))} />
-            <ParamField label="Bollinger คาบ" value={params.bbPeriod} onChange={(v) => setParams((p) => ({ ...p, bbPeriod: v }))} />
-            <ParamField label="RSI คาบ" value={params.rsiPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiPeriod: v }))} />
-            <ParamField label="RSI MA คาบ" value={params.rsiMaPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiMaPeriod: v }))} />
-            <ParamField label="ช่วงยืนยันจุดกลับตัว" value={params.swingBars} onChange={(v) => setParams((p) => ({ ...p, swingBars: v }))} />
-          </div>
-        </details>
+        <div ref={settingsRef} className="ml-auto text-[11px] text-text-muted">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((v) => !v)}
+            aria-expanded={settingsOpen}
+            className={`cursor-pointer select-none transition-colors ${
+              settingsOpen ? "text-ch-price" : "hover:text-text-secondary"
+            }`}
+          >
+            ตัวชี้วัด
+          </button>
+          {settingsOpen && (
+            <div className="absolute right-4 mt-2 module p-3 flex flex-col gap-2 z-30">
+              <ParamField label="MA เร็ว" value={params.ma1} onChange={(v) => setParams((p) => ({ ...p, ma1: v }))} />
+              <ParamField label="MA กลาง" value={params.ma2} onChange={(v) => setParams((p) => ({ ...p, ma2: v }))} />
+              <ParamField label="MA ช้า" value={params.ma3} onChange={(v) => setParams((p) => ({ ...p, ma3: v }))} />
+              <ParamField label="Bollinger คาบ" value={params.bbPeriod} onChange={(v) => setParams((p) => ({ ...p, bbPeriod: v }))} />
+              <ParamField label="RSI คาบ" value={params.rsiPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiPeriod: v }))} />
+              <ParamField label="RSI MA คาบ" value={params.rsiMaPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiMaPeriod: v }))} />
+              <ParamField label="ช่วงยืนยันจุดกลับตัว" value={params.swingBars} onChange={(v) => setParams((p) => ({ ...p, swingBars: v }))} />
+              <button
+                type="button"
+                onClick={() => {
+                  setParams(DEFAULT_PARAMS);
+                  setLayers(DEFAULT_LAYERS);
+                }}
+                className="mt-1 rounded border border-seam px-2 py-1 text-[11px] text-text-muted transition-colors hover:text-text-primary"
+              >
+                คืนค่าเริ่มต้น
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {readout && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-seam/60 px-4 py-1.5 telemetry text-[11px]">
+          <span className="text-text-muted">
+            {formatBarTime(readout.time, timeframe)}
+            {readout.live && <span className="ml-1.5 text-ch-price">· ล่าสุด</span>}
+          </span>
+          <ReadoutValue label="O" value={readout.open.toFixed(2)} />
+          <ReadoutValue label="H" value={readout.high.toFixed(2)} />
+          <ReadoutValue label="L" value={readout.low.toFixed(2)} />
+          <ReadoutValue label="C" value={readout.close.toFixed(2)} />
+          <span style={{ color: readout.change >= 0 ? "var(--up)" : "var(--down)" }}>
+            {readout.change >= 0 ? "+" : ""}
+            {readout.change.toFixed(2)} ({readout.changePercent.toFixed(2)}%)
+          </span>
+          <ReadoutValue label="VOL" value={formatVolume(readout.volume)} color={CH.volume} />
+          {showRsi && readout.rsi !== null && (
+            <ReadoutValue label="RSI" value={readout.rsi.toFixed(1)} color={CH.rsi} />
+          )}
+          {showMacd && readout.macd !== null && (
+            <ReadoutValue label="MACD" value={readout.macd.toFixed(3)} color={CH.macd} />
+          )}
+          {updatedAt !== null && (
+            <span className="ml-auto text-text-muted">
+              อัปเดต {new Date(updatedAt).toLocaleTimeString("th-TH")}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="relative" style={{ height: 200 + panesVisible * 130 }}>
         <div ref={containerRef} className="absolute inset-0" />
@@ -473,6 +664,40 @@ export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
       </div>
     </div>
   );
+}
+
+function ReadoutValue({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <span className="flex items-center gap-1">
+      <span className="text-text-muted">{label}</span>
+      <span style={{ color: color ?? "var(--text-primary)" }}>{value}</span>
+    </span>
+  );
+}
+
+function formatVolume(value: number): string {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(value);
+}
+
+/** Intraday bars need the clock; daily and coarser bars only need the date. */
+function formatBarTime(seconds: number, timeframe: TimeframeKey): string {
+  const tf = TIMEFRAMES.find((t) => t.key === timeframe);
+  const intraday = tf ? /m$|h$/.test(tf.yahooInterval) : false;
+  return new Date(seconds * 1000).toLocaleString("th-TH", {
+    dateStyle: "medium",
+    ...(intraday ? { timeStyle: "short" as const } : {}),
+  });
 }
 
 function Toggle({

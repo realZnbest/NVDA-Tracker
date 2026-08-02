@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { usePersistentState } from "@/lib/use-persistent-state";
 import { QuoteHeader } from "@/components/quote-header";
 import { PriceChart } from "@/components/price-chart";
 import { AnalysisPanel } from "@/components/analysis-panel";
@@ -11,7 +11,13 @@ import { ChatWidget } from "@/components/chat-widget";
 import type { TimeframeKey } from "@/lib/timeframes";
 
 export default function DashboardPage() {
-  const [timeframe, setTimeframe] = useState<TimeframeKey>("1H");
+  // The selected timeframe drives the chart, the analysis panel and the benchmark chart
+  // alike, so it's remembered per browser — reopening the dashboard resumes the window
+  // the owner was last working in.
+  const [timeframe, setTimeframe] = usePersistentState<TimeframeKey>(
+    "nvda.chart.timeframe",
+    "1H"
+  );
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4 p-4">

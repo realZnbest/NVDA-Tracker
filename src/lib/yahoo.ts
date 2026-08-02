@@ -144,6 +144,15 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
   return result;
 }
 
+/**
+ * Intraday bars move minute to minute, so a flat one-minute cache made the chart's
+ * live refresh mostly redundant; daily/weekly bars only change once a session, so
+ * caching those harder costs nothing and keeps Yahoo request volume down.
+ */
+function candleCacheTtl(interval: string): number {
+  return interval.endsWith("m") ? 30_000 : 5 * 60_000;
+}
+
 export async function getYahooCandles(
   symbol: string,
   range: string,
@@ -191,6 +200,6 @@ export async function getYahooCandles(
   }
 
   const candles: FinnhubCandles = { s: t.length > 0 ? "ok" : "no_data", t, o, h, l, c, v };
-  cache.set(cacheKey, { expires: Date.now() + 60_000, data: candles });
+  cache.set(cacheKey, { expires: Date.now() + candleCacheTtl(interval), data: candles });
   return candles;
 }

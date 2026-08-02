@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createChart,
   LineSeries,
@@ -9,10 +9,14 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { scopeCandles, type TimeframeKey } from "@/lib/timeframes";
+import { usePoll } from "@/lib/use-poll";
 import type { FinnhubCandles } from "@/lib/finnhub";
 
 const SP500_SYMBOL = "SPY";
 const NASDAQ_SYMBOL = "QQQ";
+
+/** Matches the price chart's cadence so both panels describe the same moment. */
+const REFRESH_INTERVAL_MS = 60_000;
 
 const CH = {
   price: "#79b900",
@@ -98,54 +102,69 @@ export function BenchmarkChart({ timeframe }: { timeframe: TimeframeKey }) {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the timeframe changes
-    setStatus("loading");
+  // Same split as the main price chart: a timeframe change is a visible reload that
+  // re-fits the view, the periodic refresh silently tops up the three series without
+  // flashing a loading state or yanking the view out from under a pan.
+  const load = useCallback(
+    (mode: "initial" | "refresh") => {
+      const cancelledRef = { current: false };
+      if (mode === "initial") setStatus("loading");
 
-    Promise.all([
-      fetch(`/api/candles?tf=${timeframe}`).then((r) => r.json()),
-      fetch(`/api/candles?tf=${timeframe}&symbol=${SP500_SYMBOL}`).then((r) => r.json()),
-      fetch(`/api/candles?tf=${timeframe}&symbol=${NASDAQ_SYMBOL}`).then((r) => r.json()),
-    ])
-      .then(([nvdaData, sp500Data, nasdaqData]) => {
-        if (cancelled) return;
-        if (nvdaData.error === "MISSING_API_KEY") {
-          setStatus("no_key");
-          return;
-        }
-        if (
-          nvdaData.error || !nvdaData.candles ||
-          sp500Data.error || !sp500Data.candles ||
-          nasdaqData.error || !nasdaqData.candles
-        ) {
-          setStatus("error");
-          return;
-        }
+      Promise.all([
+        fetch(`/api/candles?tf=${timeframe}`).then((r) => r.json()),
+        fetch(`/api/candles?tf=${timeframe}&symbol=${SP500_SYMBOL}`).then((r) => r.json()),
+        fetch(`/api/candles?tf=${timeframe}&symbol=${NASDAQ_SYMBOL}`).then((r) => r.json()),
+      ])
+        .then(([nvdaData, sp500Data, nasdaqData]) => {
+          if (cancelledRef.current) return;
+          if (nvdaData.error === "MISSING_API_KEY") {
+            if (mode === "initial") setStatus("no_key");
+            return;
+          }
+          if (
+            nvdaData.error || !nvdaData.candles ||
+            sp500Data.error || !sp500Data.candles ||
+            nasdaqData.error || !nasdaqData.candles
+          ) {
+            if (mode === "initial") setStatus("error");
+            return;
+          }
 
-        const nvdaScoped = scopeCandles(nvdaData.candles as FinnhubCandles, timeframe);
-        const sp500Scoped = scopeCandles(sp500Data.candles as FinnhubCandles, timeframe);
-        const nasdaqScoped = scopeCandles(nasdaqData.candles as FinnhubCandles, timeframe);
-        const nvdaPct = toPercentSeries(nvdaScoped);
-        const sp500Pct = toPercentSeries(sp500Scoped);
-        const nasdaqPct = toPercentSeries(nasdaqScoped);
+          const nvdaScoped = scopeCandles(nvdaData.candles as FinnhubCandles, timeframe);
+          const sp500Scoped = scopeCandles(sp500Data.candles as FinnhubCandles, timeframe);
+          const nasdaqScoped = scopeCandles(nasdaqData.candles as FinnhubCandles, timeframe);
+          const nvdaPct = toPercentSeries(nvdaScoped);
+          const sp500Pct = toPercentSeries(sp500Scoped);
+          const nasdaqPct = toPercentSeries(nasdaqScoped);
 
-        nvdaSeriesRef.current?.setData(nvdaPct);
-        sp500SeriesRef.current?.setData(sp500Pct);
-        nasdaqSeriesRef.current?.setData(nasdaqPct);
-        chartRef.current?.timeScale().fitContent();
+          nvdaSeriesRef.current?.setData(nvdaPct);
+          sp500SeriesRef.current?.setData(sp500Pct);
+          nasdaqSeriesRef.current?.setData(nasdaqPct);
+          if (mode === "initial") chartRef.current?.timeScale().fitContent();
 
-        setNvdaChange(nvdaPct.length > 0 ? nvdaPct[nvdaPct.length - 1].value : null);
-        setSp500Change(sp500Pct.length > 0 ? sp500Pct[sp500Pct.length - 1].value : null);
-        setNasdaqChange(nasdaqPct.length > 0 ? nasdaqPct[nasdaqPct.length - 1].value : null);
-        setStatus("ready");
-      })
-      .catch(() => !cancelled && setStatus("error"));
+          setNvdaChange(nvdaPct.length > 0 ? nvdaPct[nvdaPct.length - 1].value : null);
+          setSp500Change(sp500Pct.length > 0 ? sp500Pct[sp500Pct.length - 1].value : null);
+          setNasdaqChange(nasdaqPct.length > 0 ? nasdaqPct[nasdaqPct.length - 1].value : null);
+          setStatus("ready");
+        })
+        .catch(() => {
+          if (!cancelledRef.current && mode === "initial") setStatus("error");
+        });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [timeframe]);
+      return () => {
+        cancelledRef.current = true;
+      };
+    },
+    [timeframe]
+  );
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- the load flips status to "loading" up front so a timeframe switch shows it immediately
+  useEffect(() => load("initial"), [load]);
+
+  const refresh = useCallback(() => {
+    load("refresh");
+  }, [load]);
+  usePoll(refresh, REFRESH_INTERVAL_MS, { leading: false });
 
   return (
     <div className="module flex flex-col">

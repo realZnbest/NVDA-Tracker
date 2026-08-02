@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { IconArrowDown, IconArrowUp } from "./icons";
 import { NotificationBell } from "./notification-bell";
+import { usePoll } from "@/lib/use-poll";
 import type { FinnhubQuote } from "@/lib/finnhub";
 import type { ExtendedHoursQuote } from "@/lib/yahoo";
 
@@ -13,39 +14,51 @@ const SESSION_LABEL_TH: Record<ExtendedHoursQuote["session"], string> = {
   closed: "ตลาดปิด",
 };
 
+/** Session state as a faint corner wash on the header module itself, rather than a
+ *  discrete badge — a badge either has to hide on mobile (clutter in an already-tight
+ *  row) or crowd it, while a pale tint reads at any width without competing with the
+ *  price. Green while the market is actually trading, amber for the extended sessions,
+ *  no tint at all when shut — an unlit lamp has no glow, so a closed market gets none. */
+const SESSION_GLOW: Record<ExtendedHoursQuote["session"], string> = {
+  pre: "rgba(227, 169, 75, 0.10)",
+  regular: "rgba(52, 209, 124, 0.10)",
+  post: "rgba(227, 169, 75, 0.10)",
+  closed: "transparent",
+};
+
 export function QuoteHeader() {
   const [quote, setQuote] = useState<FinnhubQuote | null>(null);
   const [extended, setExtended] = useState<ExtendedHoursQuote | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = () => {
-      fetch("/api/quote")
-        .then((r) => r.json())
-        .then((data) => {
-          if (cancelled) return;
-          if (data.error === "MISSING_API_KEY") return setStatus("no_key");
-          if (data.error || !data.quote) return setStatus("error");
-          setQuote(data.quote);
-          setExtended(data.extended ?? null);
-          setStatus("ready");
-        })
-        .catch(() => !cancelled && setStatus("error"));
-    };
-    load();
-    const id = setInterval(load, 20_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
+  const load = useCallback(() => {
+    fetch("/api/quote")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error === "MISSING_API_KEY") return setStatus("no_key");
+        if (data.error || !data.quote) return setStatus("error");
+        setQuote(data.quote);
+        setExtended(data.extended ?? null);
+        setStatus("ready");
+      })
+      .catch(() => setStatus("error"));
   }, []);
+
+  usePoll(load, 20_000);
 
   const up = quote ? quote.d >= 0 : true;
   const priceColor = up ? "var(--up)" : "var(--down)";
 
   return (
-    <div className="module flex flex-wrap items-end justify-between gap-4 px-5 py-4">
+    <div
+      className="module flex flex-wrap items-end justify-between gap-4 px-5 py-4"
+      style={{
+        backgroundImage: extended
+          ? `radial-gradient(ellipse 340px 230px at 0% 0%, ${SESSION_GLOW[extended.session]}, transparent 70%)`
+          : undefined,
+      }}
+      title={extended ? `สถานะตลาด: ${SESSION_LABEL_TH[extended.session]}` : undefined}
+    >
       <div className="w-full sm:w-auto">
         <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 mb-2">
           <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">

@@ -178,6 +178,12 @@ Corners are barely rounded (`3px`, `rounded-sm`) — enough to soften a rack pan
 ### Navigation
 - **Style:** module-tab row, Thai labels at `text-sm` beside a 16px line icon; active tab gets a 2px `ch-price` underline and full-opacity `text-primary`; inactive tabs sit at `text-secondary` and lighten to `text-primary` on hover. Mobile: horizontal scroll, `whitespace-nowrap`, never wraps.
 
+### Readout Strip
+A one-line telemetry bar directly beneath the chart toolbar, separated by a half-strength seam (`border-seam/60`). All mono, `text-[11px]`: a muted field label followed by its value in `text-primary`, except values that belong to a channel (VOL, RSI, MACD), which take that channel's exact color, and the change value, which takes `up`/`down`. Follows the crosshair; with the pointer off the chart it reads the latest bar and says so (`· ล่าสุด` in `ch-price`), because an instrument readout is never blank — it shows the live value until you probe elsewhere. Last-refresh time sits right-aligned in `text-muted`, the quiet proof the panel is still live.
+
+### Session Wash
+Market state read as ambient color rather than a discrete badge, so it survives at every viewport without adding a chip to an already-tight header row: a `radial-gradient` anchored at the quote header module's top-left corner (`ellipse 340px 230px at 0% 0%`), 10%-alpha `up` green while the regular session trades, 10%-alpha amber (`#e3a94b`) in pre/post, no gradient at all when the market is shut — same "unlit lamp has no glow" rule as the Annunciator lamp, just painted as a wash instead of a dot. Stays under the price/name text in paint order and at 10% alpha specifically so it never competes with foreground contrast; the Thai session name is still available via a native tooltip (`title`) rather than repeated as on-screen text.
+
 ### Price Instrument Panel (signature component)
 The centerpiece: a single `lightweight-charts` instance split into four native panes (price+overlays, volume, RSI, MACD) inside one module, so panning/zooming/crosshair stay synchronized across all four the way linked instrument channels would. Each pane's series use its channel's exact color; the candlestick pane's price scale is trimmed to a tight top/bottom margin (`0.08` / `0.02`) so candles fill their pane rather than floating in a mostly-empty scale, keeping the boundary between panes legible.
 
