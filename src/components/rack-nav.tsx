@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { IconBell, IconLedger, IconSignal, IconWallet, IconWave } from "./icons";
 import { NotificationBell } from "./notification-bell";
+import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave },
@@ -15,6 +17,13 @@ const NAV_ITEMS = [
 
 export function RackNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  function handleSelect(result: SymbolSearchResult) {
+    setQuery("");
+    router.push(`/dashboard/${result.symbol}`);
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-seam bg-bg-raised/95 backdrop-blur">
@@ -40,11 +49,16 @@ export function RackNav() {
           })}
         </div>
 
-        <span className="ml-auto pr-4 telemetry text-[10px] text-text-muted hidden sm:block">
-          NVDA · NASDAQ
-        </span>
+        <SymbolSearchInput
+          value={query}
+          onChange={setQuery}
+          onSelect={handleSelect}
+          placeholder="ค้นหาหุ้น…"
+          className="ml-auto hidden sm:block w-56 shrink-0"
+          inputClassName="telemetry w-full rounded border border-seam bg-panel-2 py-1.5 pl-8 pr-2 text-xs text-text-primary"
+        />
 
-        <NotificationBell className="hidden sm:block pr-2" />
+        <NotificationBell className="hidden sm:block pl-2" />
       </nav>
     </header>
   );

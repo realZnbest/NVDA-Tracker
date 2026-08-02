@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAlertsContext } from "./alerts-provider";
 import { AlertsPasswordGate } from "./alerts-password-gate";
 import { IconPlus } from "./icons";
+import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 import type { AggregatePosition } from "@/lib/position";
 
 interface SymbolRow {
@@ -73,13 +74,12 @@ export function PortfolioOverview() {
     return <AlertsPasswordGate />;
   }
 
-  async function handleAddPosition(e: React.FormEvent) {
-    e.preventDefault();
-    const symbol = newSymbol.trim().toUpperCase();
-    if (!symbol) return;
+  function handleSelectSymbol(result: SymbolSearchResult) {
+    setNewSymbol("");
+    setShowAddForm(false);
     // Route straight to the (empty) detail page — adding the first lot happens there,
     // reusing the exact same add-lot form every other symbol's history uses.
-    router.push(`/portfolio/${symbol}`);
+    router.push(`/portfolio/${result.symbol}`);
   }
 
   return (
@@ -97,28 +97,17 @@ export function PortfolioOverview() {
         </div>
 
         {showAddForm && (
-          <form
-            onSubmit={handleAddPosition}
-            className="flex flex-wrap items-end gap-3 px-4 py-3 border-b border-seam/60"
-          >
-            <div className="flex flex-col gap-1.5">
-              <label className="module-label">สัญลักษณ์หุ้น (Ticker)</label>
-              <input
-                type="text"
+          <div className="flex flex-wrap items-end gap-3 px-4 py-3 border-b border-seam/60">
+            <div className="flex flex-col gap-1.5 w-64">
+              <label className="module-label">ค้นหาหุ้นที่จะเพิ่ม</label>
+              <SymbolSearchInput
                 value={newSymbol}
-                onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
-                placeholder="เช่น AAPL"
-                className="telemetry w-28 rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary uppercase"
-                required
+                onChange={setNewSymbol}
+                onSelect={handleSelectSymbol}
+                autoFocus
               />
             </div>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 rounded bg-ch-price-dim px-3 py-1.5 text-sm text-ch-price hover:brightness-125 transition-[filter]"
-            >
-              ไปที่หน้าเพิ่มรายการซื้อ
-            </button>
-          </form>
+          </div>
         )}
 
         {loading ? (

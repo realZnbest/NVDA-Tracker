@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { IconArrowDown, IconArrowUp } from "./icons";
+import { useRouter } from "next/navigation";
+import { IconArrowDown, IconArrowUp, IconSearch } from "./icons";
 import { NotificationBell } from "./notification-bell";
+import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 import { usePoll } from "@/lib/use-poll";
 import type { FinnhubQuote } from "@/lib/finnhub";
 import type { ExtendedHoursQuote } from "@/lib/yahoo";
@@ -27,9 +29,18 @@ const SESSION_GLOW: Record<ExtendedHoursQuote["session"], string> = {
 };
 
 export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
+  const router = useRouter();
   const [quote, setQuote] = useState<FinnhubQuote | null>(null);
   const [extended, setExtended] = useState<ExtendedHoursQuote | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileQuery, setMobileQuery] = useState("");
+
+  function handleMobileSelect(result: SymbolSearchResult) {
+    setMobileQuery("");
+    setMobileSearchOpen(false);
+    router.push(`/dashboard/${result.symbol}`);
+  }
 
   const load = useCallback(() => {
     fetch(`/api/quote?symbol=${symbol}`)
@@ -67,8 +78,29 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
           <span className="telemetry rounded px-2 py-0.5 text-[11px] bg-ch-price-dim text-ch-price whitespace-nowrap">
             NASDAQ · {symbol}
           </span>
-          <NotificationBell className="ml-auto sm:hidden" />
+          <div className="ml-auto flex flex-col items-end gap-1 sm:hidden">
+            <NotificationBell />
+            <button
+              onClick={() => setMobileSearchOpen((v) => !v)}
+              className="flex items-center justify-center rounded px-1.5 py-1 text-text-secondary hover:text-text-primary transition-colors"
+              aria-label="ค้นหาหุ้น"
+            >
+              <IconSearch className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+
+        {mobileSearchOpen && (
+          <div className="mb-2 sm:hidden">
+            <SymbolSearchInput
+              value={mobileQuery}
+              onChange={setMobileQuery}
+              onSelect={handleMobileSelect}
+              placeholder="ค้นหาหุ้น…"
+              autoFocus
+            />
+          </div>
+        )}
 
         {status === "ready" && quote ? (
           <>

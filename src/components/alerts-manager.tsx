@@ -5,6 +5,7 @@ import { ALERT_TYPE_LABEL_TH, PORTFOLIO_ALERT_TYPES, type Alert, type AlertType 
 import { IconPlus, IconTrash } from "./icons";
 import { useAlertsContext } from "./alerts-provider";
 import { AlertsPasswordGate } from "./alerts-password-gate";
+import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 
 const TYPES_WITH_THRESHOLD: AlertType[] = [
   "price_above",
@@ -131,15 +132,13 @@ export function AlertsManager() {
         </div>
 
         {!isPortfolioWide && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 w-48">
             <label className="module-label">สัญลักษณ์หุ้น (Ticker)</label>
-            <input
-              type="text"
+            <SymbolSearchInput
               value={symbol}
-              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              onChange={setSymbol}
+              onSelect={(result: SymbolSearchResult) => setSymbol(result.symbol)}
               placeholder="เช่น NVDA"
-              className="telemetry w-24 rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary uppercase"
-              required
             />
           </div>
         )}

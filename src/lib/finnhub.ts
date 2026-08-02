@@ -167,3 +167,19 @@ export function getEarningsCalendar(symbol: string, from: string, to: string) {
     6 * 60 * 60_000
   );
 }
+
+export interface FinnhubSearchResult {
+  symbol: string;
+  displaySymbol: string;
+  description: string;
+  type: string;
+}
+
+export interface FinnhubSearchResponse {
+  count: number;
+  result: FinnhubSearchResult[];
+}
+
+export function searchSymbols(query: string) {
+  return fetchFinnhub<FinnhubSearchResponse>("/search", { q: query }, 60 * 60_000);
+}
