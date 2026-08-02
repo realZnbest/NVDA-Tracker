@@ -44,7 +44,7 @@ export function EarningsCountdown() {
 
   return (
     <div className="module p-4">
-      <div className="module-label mb-2 text-ch-earnings">รายงานผลประกอบการถัดไป</div>
+      <div className="module-label mb-2 text-ch-price">รายงานผลประกอบการถัดไป</div>
 
       {status === "loading" && <p className="text-sm text-text-muted">กำลังโหลด…</p>}
       {status === "no_key" && (
@@ -55,7 +55,7 @@ export function EarningsCountdown() {
 
       {status === "ready" && event && (
         <div className="flex flex-col gap-1">
-          <span className="telemetry text-2xl font-medium text-ch-earnings">
+          <span className="telemetry text-2xl font-medium text-ch-price">
             {formatCountdown(event.date, now)}
           </span>
           <span className="telemetry text-xs text-text-secondary">
