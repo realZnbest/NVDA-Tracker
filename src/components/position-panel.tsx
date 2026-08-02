@@ -142,17 +142,18 @@ export function PositionPanel() {
       )}
 
       <form onSubmit={handleCreate} className="module p-4 flex flex-wrap items-end gap-3">
-        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
           <label className="module-label">วันที่ซื้อ</label>
           <input
             type="date"
+            lang="en-GB"
             value={purchaseDate}
             onChange={(e) => setPurchaseDate(e.target.value)}
-            className="w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-auto"
+            className="w-full min-w-0 max-w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-auto"
             required
           />
         </div>
-        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
           <label className="module-label">จำนวนหุ้น</label>
           <input
             type="number"
@@ -164,7 +165,7 @@ export function PositionPanel() {
             required
           />
         </div>
-        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
           <label className="module-label">ราคาต่อหุ้น ($)</label>
           <input
             type="number"
@@ -207,9 +208,10 @@ export function PositionPanel() {
                 <li key={lot.id} className="flex flex-wrap items-end gap-3 px-4 py-3 border-b border-seam/60 last:border-b-0">
                   <input
                     type="date"
+                    lang="en-GB"
                     value={editDate}
                     onChange={(e) => setEditDate(e.target.value)}
-                    className="rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
+                    className="min-w-0 max-w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
                   />
                   <input
                     type="number"

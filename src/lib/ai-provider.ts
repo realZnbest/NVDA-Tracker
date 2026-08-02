@@ -29,7 +29,7 @@ async function callGemini(
       generationConfig: {
         // A short casual-tone summary doesn't need extended reasoning — keeps it fast and cheap.
         thinkingConfig: { thinkingBudget: 0 },
-        maxOutputTokens: 400,
+        maxOutputTokens: 1600,
         temperature: 0.6,
       },
     }),
@@ -60,7 +60,7 @@ async function callOpenAiCompatible(
       model,
       messages: system ? [{ role: "system", content: system }, ...messages] : messages,
       temperature: 0.6,
-      max_tokens: 400,
+      max_tokens: 1600,
     }),
     cache: "no-store",
   });

@@ -10,6 +10,8 @@ import {
 import { IconPlus, IconTrash } from "./icons";
 import { useAlertsContext } from "./alerts-provider";
 
+const TARGETS_STORAGE_KEY = "nvda-pnl-targets";
+
 function defaultTargets(price: number): number[] {
   return [Math.round(price * 1.1), Math.round(price * 1.25), Math.round(price * 1.5)];
 }
@@ -19,6 +21,7 @@ export function PnlProjectionPanel() {
   const [aggregate, setAggregate] = useState<AggregatePosition | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [targets, setTargets] = useState<number[]>([]);
+  const [targetsLoaded, setTargetsLoaded] = useState(false);
   const [newTarget, setNewTarget] = useState("");
 
   useEffect(() => {
@@ -35,11 +38,32 @@ export function PnlProjectionPanel() {
       .catch(() => {});
   }, [authStatus]);
 
+  // Target prices are saved to localStorage (client-side, not server state), so a page
+  // refresh — or a Render redeploy, which only ever affects the server — never loses them.
   useEffect(() => {
-    if (price === null) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- default the target list once the live price loads
+    try {
+      const raw = localStorage.getItem(TARGETS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed) && parsed.every((n) => typeof n === "number")) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore from storage on mount
+        setTargets(parsed);
+      }
+    } catch {
+      // corrupt/blocked storage — fall back to defaults below
+    }
+    setTargetsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (price === null || !targetsLoaded) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- default the target list once the live price loads, only if nothing was restored from storage
     setTargets((prev) => (prev.length === 0 ? defaultTargets(price) : prev));
-  }, [price]);
+  }, [price, targetsLoaded]);
+
+  useEffect(() => {
+    if (!targetsLoaded) return;
+    localStorage.setItem(TARGETS_STORAGE_KEY, JSON.stringify(targets));
+  }, [targets, targetsLoaded]);
 
   if (authStatus !== "authenticated" || !aggregate || price === null) {
     return null;

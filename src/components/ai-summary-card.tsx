@@ -45,8 +45,41 @@ export function AiSummaryCard({ type }: { type: "news" | "financials" }) {
           </p>
         )}
         {status === "error" && <p className="text-sm text-text-muted">สรุปด้วย AI ไม่สำเร็จ ลองรีเฟรชอีกครั้ง</p>}
-        {status === "ready" && <p className="text-sm text-text-primary leading-relaxed">{summary}</p>}
+        {status === "ready" && <SummaryContent text={summary} />}
       </div>
+    </div>
+  );
+}
+
+/** Splits the model's reply into an intro line plus "- "-prefixed bullet lines and
+ * renders them as actual separate lines — a plain <p> collapses newlines, which made a
+ * multi-point summary read as one dense run-on paragraph. */
+function SummaryContent({ text }: { text: string }) {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const bullets = lines.filter((l) => l.startsWith("- "));
+  const intro = lines.filter((l) => !l.startsWith("- "));
+
+  if (bullets.length === 0) {
+    return <p className="text-sm text-text-primary leading-relaxed">{text}</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {intro.map((line, i) => (
+        <p key={i} className="text-sm text-text-primary leading-relaxed">
+          {line}
+        </p>
+      ))}
+      <ul className="flex flex-col gap-1.5">
+        {bullets.map((line, i) => (
+          <li
+            key={i}
+            className="text-sm text-text-secondary leading-relaxed pl-3 relative before:content-['·'] before:absolute before:left-0 before:text-ch-rsi"
+          >
+            {line.slice(2)}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
