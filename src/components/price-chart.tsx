@@ -27,6 +27,8 @@ import {
   sma,
 } from "@/lib/indicators";
 import type { FinnhubCandles } from "@/lib/finnhub";
+import { computeAggregatePosition } from "@/lib/position";
+import { useAlertsContext } from "./alerts-provider";
 
 const CH = {
   price: "#79b900",
@@ -69,6 +71,10 @@ export function PriceChart() {
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick" | "Line" | "Histogram">>>({});
   const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
   const srLinesRef = useRef<IPriceLine[]>([]);
+  const breakEvenLineRef = useRef<IPriceLine | null>(null);
+
+  const { authStatus } = useAlertsContext();
+  const [avgCost, setAvgCost] = useState<number | null>(null);
 
   const [timeframe, setTimeframe] = useState<TimeframeKey>("1H");
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
@@ -84,6 +90,28 @@ export function PriceChart() {
   const [showMacd, setShowMacd] = useState(true);
   const [showSR, setShowSR] = useState(true);
   const [showStructure, setShowStructure] = useState(true);
+
+  // Break-even line is private (the owner's own cost basis) — only fetched/drawn for an
+  // authenticated owner session, even though this chart itself renders on the public dashboard.
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear private data on logout
+      setAvgCost(null);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/position")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const aggregate = computeAggregatePosition(data.lots ?? []);
+        setAvgCost(aggregate?.avgCost ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -318,6 +346,21 @@ export function PriceChart() {
       }
     }
 
+    if (breakEvenLineRef.current) {
+      s.candle.removePriceLine(breakEvenLineRef.current);
+      breakEvenLineRef.current = null;
+    }
+    if (avgCost !== null) {
+      breakEvenLineRef.current = s.candle.createPriceLine({
+        price: avgCost,
+        color: "rgba(242,200,121,0.9)",
+        lineWidth: 2,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: "จุดคุ้มทุน",
+      });
+    }
+
     const markers: SeriesMarker<Time>[] = showStructure
       ? computed.structure.map((event) => ({
           time: event.time as UTCTimestamp,
@@ -340,6 +383,7 @@ export function PriceChart() {
     showMacd,
     showSR,
     showStructure,
+    avgCost,
   ]);
 
   // Scope the default view to what the selected tab means (e.g. "1D" opens on the last

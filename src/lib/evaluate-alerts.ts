@@ -1,13 +1,16 @@
 import { ema, macd, rsi } from "./indicators";
 import { addNotification, listAlerts, markAlertTriggered } from "./alerts-store";
+import { computePositionMetrics, type AggregatePosition } from "./position";
 import { ALERT_TYPE_LABEL_TH } from "./types";
 import type { Alert, AlertNotification } from "./types";
+import { sendAlertEmail } from "./email";
 
 const COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 export interface MarketSnapshot {
   price: number;
   closes: number[];
+  position?: AggregatePosition | null;
 }
 
 function fmt(n: number) {
@@ -18,7 +21,8 @@ export async function evaluateAlerts(snapshot: MarketSnapshot): Promise<AlertNot
   const alerts = (await listAlerts()).filter((a) => a.active);
   if (alerts.length === 0) return [];
 
-  const { price, closes } = snapshot;
+  const { price, closes, position } = snapshot;
+  const pnlPercent = position ? computePositionMetrics(position, price).unrealizedPnlPercent : null;
   const rsiSeries = rsi(closes, 14);
   const macdSeries = macd(closes);
   const ma50 = ema(closes, 50);
@@ -112,11 +116,23 @@ export async function evaluateAlerts(snapshot: MarketSnapshot): Promise<AlertNot
           message = `เกิด Death Cross: MA50 ตัดลงใต้ MA200`;
         }
         break;
+      case "pnl_percent_above":
+        if (pnlPercent !== null && alert.threshold !== null && pnlPercent > alert.threshold) {
+          message = `พอร์ตกำไรถึง ${fmt(pnlPercent)}% แล้ว (เกณฑ์ ${alert.threshold}%)`;
+        }
+        break;
+      case "pnl_percent_below":
+        if (pnlPercent !== null && alert.threshold !== null && pnlPercent < alert.threshold) {
+          message = `พอร์ตขาดทุนถึง ${fmt(pnlPercent)}% แล้ว (เกณฑ์ ${alert.threshold}%)`;
+        }
+        break;
     }
 
     if (message) {
       await markAlertTriggered(alert.id);
-      fired.push(await addNotification(alert.id, `[${ALERT_TYPE_LABEL_TH[alert.type]}] ${message}`));
+      const fullMessage = `[${ALERT_TYPE_LABEL_TH[alert.type]}] ${message}`;
+      fired.push(await addNotification(alert.id, fullMessage));
+      void sendAlertEmail(alert.label, fullMessage);
     }
   }
 

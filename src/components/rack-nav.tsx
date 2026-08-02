@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconBell, IconLedger, IconSignal, IconWave } from "./icons";
+import { IconBell, IconLedger, IconSignal, IconWallet, IconWave } from "./icons";
 import { NotificationBell } from "./notification-bell";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave },
   { href: "/financials", label: "งบการเงิน", icon: IconLedger },
   { href: "/news", label: "ข่าว", icon: IconSignal },
+  { href: "/portfolio", label: "พอร์ตของฉัน", icon: IconWallet },
   { href: "/alerts", label: "การแจ้งเตือน", icon: IconBell },
 ] as const;
 

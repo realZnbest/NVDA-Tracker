@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { AnalysisRead } from "@/lib/analysis";
+import { computeAggregatePosition, computePositionMetrics, type PositionLot } from "@/lib/position";
+import { useAlertsContext } from "./alerts-provider";
 
 const VERDICT_TH: Record<AnalysisRead["verdict"], { label: string; color: string }> = {
   bullish: { label: "เอนไปทางขาขึ้น", color: "var(--up)" },
@@ -11,8 +13,10 @@ const VERDICT_TH: Record<AnalysisRead["verdict"], { label: string; color: string
 };
 
 export function AnalysisPanel() {
+  const { authStatus } = useAlertsContext();
   const [read, setRead] = useState<AnalysisRead | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
+  const [positionLine, setPositionLine] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/analysis")
@@ -25,6 +29,35 @@ export function AnalysisPanel() {
       })
       .catch(() => setStatus("error"));
   }, []);
+
+  // Position data is private — only fetched/rendered for an authenticated owner session,
+  // even though this panel itself renders on the public dashboard.
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear private data on logout
+      setPositionLine(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/position").then((r) => r.json()),
+      fetch("/api/quote").then((r) => r.json()),
+    ])
+      .then(([positionData, quoteData]) => {
+        if (cancelled) return;
+        const aggregate = computeAggregatePosition((positionData.lots ?? []) as PositionLot[]);
+        if (!aggregate || !quoteData.quote) return;
+        const metrics = computePositionMetrics(aggregate, quoteData.quote.c);
+        const sign = metrics.unrealizedPnl >= 0 ? "+" : "";
+        setPositionLine(
+          `คุณถือ ${aggregate.totalShares.toLocaleString()} หุ้น ต้นทุนเฉลี่ย $${aggregate.avgCost.toFixed(2)} → กำไร/ขาดทุนขณะนี้ ${sign}${metrics.unrealizedPnlPercent.toFixed(2)}% (${sign}$${metrics.unrealizedPnl.toFixed(2)})`
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus]);
 
   return (
     <div className="module p-4">
@@ -74,6 +107,19 @@ export function AnalysisPanel() {
               ))}
             </ul>
           </div>
+
+          {positionLine && (
+            <div>
+              <div className="telemetry text-[10px] mb-1.5" style={{ color: "#f2c879" }}>
+                ด้านพอร์ต
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                <li className="text-xs text-text-secondary leading-relaxed pl-3 relative before:content-['·'] before:absolute before:left-0 before:text-[#f2c879]">
+                  {positionLine}
+                </li>
+              </ul>
+            </div>
+          )}
 
           <p className="text-[10px] text-text-muted border-t border-seam pt-2">
             บทวิเคราะห์นี้สร้างจากกฎที่ตั้งไว้ล่วงหน้า ไม่ใช่คำแนะนำการลงทุน โปรดใช้ประกอบการตัดสินใจของคุณเอง

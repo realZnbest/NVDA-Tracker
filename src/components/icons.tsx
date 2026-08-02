@@ -97,3 +97,13 @@ export function IconSpark({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconWallet({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 7a2 2 0 0 1 2-2h11a1 1 0 0 1 1 1v2" />
+      <path d="M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-4" />
+      <path d="M15 12h5v4h-5a2 2 0 0 1 0-4Z" />
+    </svg>
+  );
+}

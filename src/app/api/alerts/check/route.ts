@@ -4,19 +4,23 @@ import { getYahooCandles } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 import { evaluateAlerts } from "@/lib/evaluate-alerts";
 import { requireAlertsAuth } from "@/lib/alerts-auth";
+import { listLots } from "@/lib/position-store";
+import { computeAggregatePosition } from "@/lib/position";
 
 export async function POST() {
   const unauth = await requireAlertsAuth();
   if (unauth) return unauth;
   try {
-    const [candles, quote] = await Promise.all([
+    const [candles, quote, lots] = await Promise.all([
       getYahooCandles(SYMBOL, "2y", "1d"),
       getQuote(SYMBOL),
+      listLots(),
     ]);
     if (candles.s !== "ok" || candles.c.length < 30) {
       return NextResponse.json({ fired: [] });
     }
-    const fired = await evaluateAlerts({ price: quote.c, closes: candles.c });
+    const position = computeAggregatePosition(lots);
+    const fired = await evaluateAlerts({ price: quote.c, closes: candles.c, position });
     return NextResponse.json({ fired });
   } catch (err) {
     if (err instanceof FinnhubError) {

@@ -48,6 +48,15 @@ export async function getDb(): Promise<Client> {
         readAt INTEGER
       )
     `);
+    await globalThis.__nvdaTurso.execute(`
+      CREATE TABLE IF NOT EXISTS position_lots (
+        id TEXT PRIMARY KEY,
+        purchaseDate INTEGER NOT NULL,
+        shares REAL NOT NULL,
+        pricePerShare REAL NOT NULL,
+        createdAt INTEGER NOT NULL
+      )
+    `);
     globalThis.__nvdaTursoInitialized = true;
   }
   return globalThis.__nvdaTurso;

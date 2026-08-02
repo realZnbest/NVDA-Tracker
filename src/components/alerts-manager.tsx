@@ -6,7 +6,12 @@ import { IconPlus, IconTrash } from "./icons";
 import { useAlertsContext } from "./alerts-provider";
 import { AlertsPasswordGate } from "./alerts-password-gate";
 
-const TYPES_WITH_THRESHOLD: AlertType[] = ["price_above", "price_below"];
+const TYPES_WITH_THRESHOLD: AlertType[] = [
+  "price_above",
+  "price_below",
+  "pnl_percent_above",
+  "pnl_percent_below",
+];
 const TYPES_WITH_OPTIONAL_THRESHOLD: AlertType[] = ["rsi_overbought", "rsi_oversold"];
 
 const DEFAULT_THRESHOLD: Partial<Record<AlertType, number>> = {
@@ -107,7 +112,11 @@ export function AlertsManager() {
         {(needsThreshold || optionalThreshold) && (
           <div className="flex flex-col gap-1.5">
             <label className="module-label">
-              {type.startsWith("price") ? "ราคาเป้าหมาย ($)" : "เกณฑ์ (ค่าเริ่มต้นถ้าเว้นว่าง)"}
+              {type.startsWith("price")
+                ? "ราคาเป้าหมาย ($)"
+                : type.startsWith("pnl_percent")
+                  ? "เกณฑ์ (%)"
+                  : "เกณฑ์ (ค่าเริ่มต้นถ้าเว้นว่าง)"}
             </label>
             <input
               type="number"
