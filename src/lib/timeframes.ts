@@ -1,3 +1,5 @@
+import type { FinnhubCandles } from "./finnhub";
+
 export type TimeframeKey =
   | "1H"
   | "1D"
@@ -38,3 +40,38 @@ export const TIMEFRAMES: Timeframe[] = [
 ];
 
 export const SYMBOL = "NVDA";
+
+/**
+ * Slices a candle set down to the window the selected tab is scoped to (e.g. "1D" means
+ * the last day), not the full over-fetched history kept around for zoom-out headroom.
+ * Mirrors the visible-range logic in price-chart.tsx's "scope the default view" effect.
+ */
+export function scopeCandles(candles: FinnhubCandles, key: TimeframeKey): FinnhubCandles {
+  const times = candles.t;
+  if (times.length === 0) return candles;
+
+  const tf = TIMEFRAMES.find((t) => t.key === key);
+  const lastTime = times[times.length - 1];
+  let fromTime: number;
+  if (tf?.scopeDays === "ytd") {
+    const lastDate = new Date(lastTime * 1000);
+    fromTime = Date.UTC(lastDate.getUTCFullYear(), 0, 1) / 1000;
+  } else if (tf) {
+    fromTime = lastTime - tf.scopeDays * 24 * 60 * 60;
+  } else {
+    fromTime = times[0];
+  }
+  fromTime = Math.max(fromTime, times[0]);
+
+  const startIndex = times.findIndex((t) => t >= fromTime);
+  const from = startIndex === -1 ? times.length : startIndex;
+  return {
+    s: candles.s,
+    t: candles.t.slice(from),
+    o: candles.o.slice(from),
+    h: candles.h.slice(from),
+    l: candles.l.slice(from),
+    c: candles.c.slice(from),
+    v: candles.v.slice(from),
+  };
+}

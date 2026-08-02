@@ -28,6 +28,8 @@
   --ch-alert-dim: #5c2222;
   --ch-earnings: #f2994a;
   --ch-earnings-dim: #5c3d1e;
+  --ch-benchmark: #5b8fd9;
+  --ch-benchmark-dim: #24344f;
 
   --up: #34d17c;
   --down: #ef5b5b;
@@ -61,6 +63,8 @@
   --color-ch-alert-dim: var(--ch-alert-dim);
   --color-ch-earnings: var(--ch-earnings);
   --color-ch-earnings-dim: var(--ch-earnings-dim);
+  --color-ch-benchmark: var(--ch-benchmark);
+  --color-ch-benchmark-dim: var(--ch-benchmark-dim);
 
   --color-up: var(--up);
   --color-down: var(--down);

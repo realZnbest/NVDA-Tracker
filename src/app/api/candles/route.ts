@@ -4,10 +4,11 @@ import { SYMBOL, TIMEFRAMES, type TimeframeKey } from "@/lib/timeframes";
 
 export async function GET(request: NextRequest) {
   const key = (request.nextUrl.searchParams.get("tf") ?? "1H") as TimeframeKey;
+  const symbol = request.nextUrl.searchParams.get("symbol") ?? SYMBOL;
   const tf = TIMEFRAMES.find((t) => t.key === key) ?? TIMEFRAMES.find((t) => t.key === "1H")!;
 
   try {
-    const candles = await getYahooCandles(SYMBOL, tf.yahooRange, tf.yahooInterval);
+    const candles = await getYahooCandles(symbol, tf.yahooRange, tf.yahooInterval);
     if (candles.s !== "ok") {
       return NextResponse.json({ error: "NO_DATA", detail: candles.s }, { status: 200 });
     }

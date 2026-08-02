@@ -65,7 +65,12 @@ const DEFAULT_PARAMS: Params = {
   swingBars: 5,
 };
 
-export function PriceChart() {
+interface PriceChartProps {
+  timeframe: TimeframeKey;
+  onTimeframeChange: (tf: TimeframeKey) => void;
+}
+
+export function PriceChart({ timeframe, onTimeframeChange }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick" | "Line" | "Histogram">>>({});
@@ -76,7 +81,6 @@ export function PriceChart() {
   const { authStatus } = useAlertsContext();
   const [avgCost, setAvgCost] = useState<number | null>(null);
 
-  const [timeframe, setTimeframe] = useState<TimeframeKey>("1H");
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
   const [params, setParams] = useState<Params>(DEFAULT_PARAMS);
@@ -421,7 +425,7 @@ export function PriceChart() {
           {TIMEFRAMES.map((tf) => (
             <button
               key={tf.key}
-              onClick={() => setTimeframe(tf.key)}
+              onClick={() => onTimeframeChange(tf.key)}
               className={`telemetry rounded px-2 py-1 text-[11px] transition-colors ${
                 timeframe === tf.key
                   ? "bg-ch-price-dim text-ch-price"
