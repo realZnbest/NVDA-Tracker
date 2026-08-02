@@ -119,7 +119,7 @@ export function AnalysisPanel({ timeframe }: { timeframe: TimeframeKey }) {
           {positionLine && (
             <div>
               <div className="telemetry text-[10px] mb-1.5" style={{ color: "#f2c879" }}>
-                ด้านพอร์ต
+                ด้านพอร์ตของคุณ
               </div>
               <ul className="flex flex-col gap-1.5">
                 <li className="text-xs text-text-secondary leading-relaxed pl-3 relative before:content-['·'] before:absolute before:left-0 before:text-[#f2c879]">

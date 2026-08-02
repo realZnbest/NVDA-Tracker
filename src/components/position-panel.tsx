@@ -135,17 +135,17 @@ export function PositionPanel() {
       )}
 
       <form onSubmit={handleCreate} className="module p-4 flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="module-label">วันที่ซื้อ</label>
           <input
             type="date"
             value={purchaseDate}
             onChange={(e) => setPurchaseDate(e.target.value)}
-            className="telemetry rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
+            className="telemetry w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-auto"
             required
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="module-label">จำนวนหุ้น</label>
           <input
             type="number"
@@ -153,11 +153,11 @@ export function PositionPanel() {
             value={shares}
             onChange={(e) => setShares(e.target.value)}
             placeholder="เช่น 10"
-            className="telemetry w-28 rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
+            className="telemetry w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-28"
             required
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="module-label">ราคาต่อหุ้น ($)</label>
           <input
             type="number"
@@ -165,7 +165,7 @@ export function PositionPanel() {
             value={pricePerShare}
             onChange={(e) => setPricePerShare(e.target.value)}
             placeholder="เช่น 150.00"
-            className="telemetry w-32 rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary"
+            className="telemetry w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-32"
             required
           />
         </div>
