@@ -171,6 +171,7 @@ export function PriceChart() {
       },
       rightPriceScale: { borderColor: CH.seam },
       timeScale: { borderColor: CH.seam, timeVisible: true, secondsVisible: false },
+      handleScroll: { vertTouchDrag: false },
       autoSize: true,
     });
     chartRef.current = chart;
