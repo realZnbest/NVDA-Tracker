@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { AnalysisRead } from "@/lib/analysis";
 import { computeAggregatePosition, computePositionMetrics, type PositionLot } from "@/lib/position";
 import { useAlertsContext } from "./alerts-provider";
+import type { TimeframeKey } from "@/lib/timeframes";
 
 const VERDICT_TH: Record<AnalysisRead["verdict"], { label: string; color: string }> = {
   bullish: { label: "เอนไปทางขาขึ้น", color: "var(--up)" },
@@ -12,23 +13,30 @@ const VERDICT_TH: Record<AnalysisRead["verdict"], { label: string; color: string
   mixed: { label: "สัญญาณผสม", color: "var(--ch-price)" },
 };
 
-export function AnalysisPanel() {
+export function AnalysisPanel({ timeframe }: { timeframe: TimeframeKey }) {
   const { authStatus } = useAlertsContext();
   const [read, setRead] = useState<AnalysisRead | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
   const [positionLine, setPositionLine] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/analysis")
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the timeframe changes
+    setStatus("loading");
+    fetch(`/api/analysis?tf=${timeframe}`)
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         if (data.error === "MISSING_API_KEY") return setStatus("no_key");
         if (data.error || !data.read) return setStatus("error");
         setRead(data.read);
         setStatus("ready");
       })
-      .catch(() => setStatus("error"));
-  }, []);
+      .catch(() => !cancelled && setStatus("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [timeframe]);
 
   // Position data is private — only fetched/rendered for an authenticated owner session,
   // even though this panel itself renders on the public dashboard.

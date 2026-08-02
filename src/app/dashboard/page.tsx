@@ -19,7 +19,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
         <PriceChart timeframe={timeframe} onTimeframeChange={setTimeframe} />
         <div className="flex flex-col gap-4">
-          <AnalysisPanel />
+          <AnalysisPanel timeframe={timeframe} />
           <AnalystPanel />
           <EarningsCountdown />
         </div>

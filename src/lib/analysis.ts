@@ -1,6 +1,6 @@
 import { getBasicFinancials, getQuote } from "./finnhub";
 import { getYahooCandles } from "./yahoo";
-import { SYMBOL } from "./timeframes";
+import { SYMBOL, TIMEFRAMES, type TimeframeKey } from "./timeframes";
 import { bollinger, ema, lastValid, macd, rsi, sma } from "./indicators";
 
 export class AnalysisDataError extends Error {}
@@ -42,7 +42,10 @@ function pct(n: number) {
   return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 }
 
-export function buildTechnicalRead(input: TechnicalInputs): {
+export function buildTechnicalRead(
+  input: TechnicalInputs,
+  timeframeLabel: string = "รายวัน"
+): {
   lines: string[];
   score: number;
 } {
@@ -52,26 +55,26 @@ export function buildTechnicalRead(input: TechnicalInputs): {
   if (input.rsi !== null) {
     if (input.rsi >= 70) {
       lines.push(
-        `RSI อยู่ที่ ${input.rsi.toFixed(1)} เข้าเขตซื้อมากเกิน (Overbought) — โมเมนตัมแข็งแกร่งแต่เสี่ยงพักตัวระยะสั้น`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เข้าเขตซื้อมากเกิน (Overbought) — โมเมนตัมแข็งแกร่งแต่เสี่ยงพักตัวระยะสั้น`
       );
       score -= 1;
     } else if (input.rsi <= 30) {
       lines.push(
-        `RSI อยู่ที่ ${input.rsi.toFixed(1)} เข้าเขตขายมากเกิน (Oversold) — แรงขายอาจเริ่มอ่อนแรงลง`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เข้าเขตขายมากเกิน (Oversold) — แรงขายอาจเริ่มอ่อนแรงลง`
       );
       score += 1;
     } else if (input.rsi >= 55) {
       lines.push(
-        `RSI อยู่ที่ ${input.rsi.toFixed(1)} เอนไปทางฝั่งซื้อ สะท้อนแนวโน้มขาขึ้นที่ยังไม่ตึงตัวเกินไป`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เอนไปทางฝั่งซื้อ สะท้อนแนวโน้มขาขึ้นที่ยังไม่ตึงตัวเกินไป`
       );
       score += 0.5;
     } else if (input.rsi <= 45) {
       lines.push(
-        `RSI อยู่ที่ ${input.rsi.toFixed(1)} เอนไปทางฝั่งขาย สะท้อนแรงกดดันขาลงที่ยังไม่ถึงจุดสุดขั้ว`
+        `RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} เอนไปทางฝั่งขาย สะท้อนแรงกดดันขาลงที่ยังไม่ถึงจุดสุดขั้ว`
       );
       score -= 0.5;
     } else {
-      lines.push(`RSI อยู่ที่ ${input.rsi.toFixed(1)} อยู่ในโซนกลาง ยังไม่ชี้ทิศทางชัดเจน`);
+      lines.push(`RSI (${timeframeLabel}) อยู่ที่ ${input.rsi.toFixed(1)} อยู่ในโซนกลาง ยังไม่ชี้ทิศทางชัดเจน`);
     }
   }
 
@@ -85,45 +88,45 @@ export function buildTechnicalRead(input: TechnicalInputs): {
     const strengthening =
       Math.abs(input.macdHistLast) > Math.abs(input.macdHistPrev);
     if (above && strengthening) {
-      lines.push("MACD อยู่เหนือเส้นสัญญาณและช่องว่างกว้างขึ้น — แรงส่งขาขึ้นกำลังเพิ่มขึ้น");
+      lines.push(`MACD (${timeframeLabel}) อยู่เหนือเส้นสัญญาณและช่องว่างกว้างขึ้น — แรงส่งขาขึ้นกำลังเพิ่มขึ้น`);
       score += 1;
     } else if (above) {
-      lines.push("MACD อยู่เหนือเส้นสัญญาณแต่ช่องว่างเริ่มแคบลง — แนวโน้มขาขึ้นเริ่มชะลอ");
+      lines.push(`MACD (${timeframeLabel}) อยู่เหนือเส้นสัญญาณแต่ช่องว่างเริ่มแคบลง — แนวโน้มขาขึ้นเริ่มชะลอ`);
       score += 0.3;
     } else if (!above && strengthening) {
-      lines.push("MACD อยู่ใต้เส้นสัญญาณและช่องว่างกว้างขึ้น — แรงกดดันขาลงกำลังเพิ่มขึ้น");
+      lines.push(`MACD (${timeframeLabel}) อยู่ใต้เส้นสัญญาณและช่องว่างกว้างขึ้น — แรงกดดันขาลงกำลังเพิ่มขึ้น`);
       score -= 1;
     } else {
-      lines.push("MACD อยู่ใต้เส้นสัญญาณแต่ช่องว่างเริ่มแคบลง — แรงขายเริ่มอ่อนแรง อาจใกล้กลับตัว");
+      lines.push(`MACD (${timeframeLabel}) อยู่ใต้เส้นสัญญาณแต่ช่องว่างเริ่มแคบลง — แรงขายเริ่มอ่อนแรง อาจใกล้กลับตัว`);
       score -= 0.3;
     }
   }
 
   if (input.ma20 !== null && input.ma50 !== null && input.ma200 !== null) {
     if (input.price > input.ma20 && input.ma20 > input.ma50 && input.ma50 > input.ma200) {
-      lines.push("ราคาอยู่เหนือ MA20, MA50 และ MA200 ตามลำดับ — โครงสร้างแนวโน้มขาขึ้นแข็งแรง");
+      lines.push("ราคาอยู่เหนือ MA20, MA50 และ MA200 (รายวัน) ตามลำดับ — โครงสร้างแนวโน้มขาขึ้นแข็งแรง");
       score += 1.5;
     } else if (
       input.price < input.ma20 &&
       input.ma20 < input.ma50 &&
       input.ma50 < input.ma200
     ) {
-      lines.push("ราคาอยู่ใต้ MA20, MA50 และ MA200 ตามลำดับ — โครงสร้างแนวโน้มขาลงแข็งแรง");
+      lines.push("ราคาอยู่ใต้ MA20, MA50 และ MA200 (รายวัน) ตามลำดับ — โครงสร้างแนวโน้มขาลงแข็งแรง");
       score -= 1.5;
     } else if (input.ma50 > input.ma200) {
-      lines.push("MA50 ยังอยู่เหนือ MA200 (แนวโน้มหลักยังเป็นขาขึ้น) แต่ราคาระยะสั้นเริ่มแกว่งตัว");
+      lines.push("MA50 (รายวัน) ยังอยู่เหนือ MA200 (แนวโน้มหลักยังเป็นขาขึ้น) แต่ราคาระยะสั้นเริ่มแกว่งตัว");
       score += 0.3;
     } else {
-      lines.push("MA50 อยู่ใต้ MA200 (แนวโน้มหลักยังเป็นขาลง) ต้องรอสัญญาณกลับตัวที่ชัดเจนกว่านี้");
+      lines.push("MA50 (รายวัน) อยู่ใต้ MA200 (แนวโน้มหลักยังเป็นขาลง) ต้องรอสัญญาณกลับตัวที่ชัดเจนกว่านี้");
       score -= 0.3;
     }
   }
 
   if (input.bollingerUpper !== null && input.bollingerLower !== null) {
     if (input.price >= input.bollingerUpper) {
-      lines.push("ราคาแตะกรอบบนของ Bollinger Band — ความผันผวนสูงและราคายืดตัวเต็มกรอบ");
+      lines.push("ราคาแตะกรอบบนของ Bollinger Band (รายวัน) — ความผันผวนสูงและราคายืดตัวเต็มกรอบ");
     } else if (input.price <= input.bollingerLower) {
-      lines.push("ราคาแตะกรอบล่างของ Bollinger Band — อาจเกิดแรงซื้อกลับในกรอบความผันผวนนี้");
+      lines.push("ราคาแตะกรอบล่างของ Bollinger Band (รายวัน) — อาจเกิดแรงซื้อกลับในกรอบความผันผวนนี้");
     }
   }
 
@@ -193,9 +196,10 @@ export function buildFundamentalRead(input: FundamentalInputs): {
 
 export function synthesize(
   technical: TechnicalInputs,
-  fundamental: FundamentalInputs
+  fundamental: FundamentalInputs,
+  timeframeLabel?: string
 ): AnalysisRead {
-  const tech = buildTechnicalRead(technical);
+  const tech = buildTechnicalRead(technical, timeframeLabel);
   const fund = buildFundamentalRead(fundamental);
   const total = tech.score + fund.score;
 
@@ -225,26 +229,37 @@ export function synthesize(
  * src/app/api/analysis/route.ts serves to the analysis panel, extracted here so any other
  * caller (e.g. the chat context builder) gets real computed RSI/MACD/MA readings instead
  * of duplicating this fetch-and-compute wiring.
+ *
+ * MA20/MA50/MA200 and Bollinger Bands are always computed from daily candles regardless of
+ * `timeframe` — their labels (e.g. "MA200") conventionally mean a 200-*day* average, and
+ * computing them off intraday bars would silently redefine what the number means. RSI and
+ * MACD don't carry that same fixed-period convention, so they follow whatever `timeframe`
+ * the caller is currently looking at (matches the price chart's own selected tab).
  */
-export async function getAnalysisRead(): Promise<AnalysisRead> {
-  const [candles, quote, financials] = await Promise.all([
+export async function getAnalysisRead(timeframe: TimeframeKey = "1H"): Promise<AnalysisRead> {
+  const tf = TIMEFRAMES.find((t) => t.key === timeframe) ?? TIMEFRAMES.find((t) => t.key === "1H")!;
+
+  const [dailyCandles, tfCandles, quote, financials] = await Promise.all([
     getYahooCandles(SYMBOL, "2y", "1d"),
+    getYahooCandles(SYMBOL, tf.yahooRange, tf.yahooInterval),
     getQuote(SYMBOL),
     getBasicFinancials(SYMBOL),
   ]);
 
-  if (candles.s !== "ok" || candles.c.length < 30) {
+  if (dailyCandles.s !== "ok" || dailyCandles.c.length < 30 || tfCandles.s !== "ok" || tfCandles.c.length < 30) {
     throw new AnalysisDataError("NO_DATA");
   }
 
-  const closes = candles.c;
   const price = quote.c;
-  const rsiSeries = rsi(closes, 14);
-  const macdSeries = macd(closes);
-  const ma20 = sma(closes, 20);
-  const ma50 = ema(closes, 50);
-  const ma200 = ema(closes, 200);
-  const bb = bollinger(closes, 20);
+
+  const rsiSeries = rsi(tfCandles.c, 14);
+  const macdSeries = macd(tfCandles.c);
+
+  const dailyCloses = dailyCandles.c;
+  const ma20 = sma(dailyCloses, 20);
+  const ma50 = ema(dailyCloses, 50);
+  const ma200 = ema(dailyCloses, 200);
+  const bb = bollinger(dailyCloses, 20);
   const m = financials.metric;
 
   return synthesize(
@@ -271,6 +286,7 @@ export async function getAnalysisRead(): Promise<AnalysisRead> {
       week52High: m["52WeekHigh"] ?? null,
       week52Low: m["52WeekLow"] ?? null,
       price,
-    }
+    },
+    timeframe
   );
 }
