@@ -130,10 +130,18 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
             {extended && (extended.pre || extended.post) && (
               <div className="flex flex-wrap gap-4 mt-2">
                 {extended.pre && (
-                  <ExtendedRow label={SESSION_LABEL_TH.pre} data={extended.pre} />
+                  <ExtendedRow
+                    label={SESSION_LABEL_TH.pre}
+                    price={extended.pre.price}
+                    baseline={quote.c}
+                  />
                 )}
                 {extended.post && (
-                  <ExtendedRow label={SESSION_LABEL_TH.post} data={extended.post} />
+                  <ExtendedRow
+                    label={SESSION_LABEL_TH.post}
+                    price={extended.post.price}
+                    baseline={quote.c}
+                  />
                 )}
               </div>
             )}
@@ -161,24 +169,42 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
   );
 }
 
+/**
+ * Extended-hours delta is measured against `baseline` — the regular-session price shown
+ * directly above it — not against yesterday's close as the market-data convention (and
+ * the feed's own `change` field) would have it. The convention answers "how far has the
+ * stock moved today", which the main price line already says; stacked under that line the
+ * useful question is "is it moving up or down from here", and a pre-market print below the
+ * regular price reading green because it's still above yesterday's close contradicts the
+ * two numbers sitting side by side on screen. Deriving the arrow from the displayed
+ * baseline keeps the row self-consistent by construction.
+ */
 function ExtendedRow({
   label,
-  data,
+  price,
+  baseline,
 }: {
   label: string;
-  data: { price: number; change: number; changePercent: number };
+  price: number;
+  baseline: number;
 }) {
-  const up = data.change >= 0;
-  const color = up ? "var(--up)" : "var(--down)";
+  const change = baseline > 0 ? price - baseline : 0;
+  const changePercent = baseline > 0 ? (change / baseline) * 100 : 0;
+  // Anything under half a cent prints as "0.00" — colour it green/red and the tint would
+  // be claiming a direction the digits don't show, so those round to flat too.
+  const direction = Math.abs(change) < 0.005 ? 0 : Math.sign(change);
+  const color =
+    direction > 0 ? "var(--up)" : direction < 0 ? "var(--down)" : "var(--text-secondary)";
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="text-text-muted">{label}</span>
       <span className="telemetry" style={{ color }}>
-        ${data.price.toFixed(2)}
+        ${price.toFixed(2)}
       </span>
       <span className="telemetry flex items-center gap-0.5" style={{ color }}>
-        {up ? <IconArrowUp className="h-3 w-3" /> : <IconArrowDown className="h-3 w-3" />}
-        {Math.abs(data.change).toFixed(2)} ({data.changePercent.toFixed(2)}%)
+        {direction > 0 && <IconArrowUp className="h-3 w-3" />}
+        {direction < 0 && <IconArrowDown className="h-3 w-3" />}
+        {Math.abs(change).toFixed(2)} ({Math.abs(changePercent).toFixed(2)}%)
       </span>
     </div>
   );
