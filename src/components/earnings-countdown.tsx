@@ -66,8 +66,14 @@ export function EarningsCountdown({ symbol }: { symbol: string }) {
             {formatCountdown(event.date, now)}
           </span>
           <span className="telemetry text-xs text-text-secondary">
-            {new Date(`${event.date}T00:00:00`).toLocaleDateString("th-TH", {
-              dateStyle: "long",
+            {/* "-u-ca-gregory": plain "th-TH" defaults to the Buddhist era ("26 สิงหาคม 2569"),
+                which this app deliberately doesn't show anywhere. Spelled out as explicit
+                day/month/year rather than dateStyle:"long", which tacks a "ค.ศ." era
+                marker onto the Gregorian year. */}
+            {new Date(`${event.date}T00:00:00`).toLocaleDateString("th-TH-u-ca-gregory", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
             })}
             {event.hour && HOUR_LABEL_TH[event.hour] && ` · ${HOUR_LABEL_TH[event.hour]}`}
           </span>
