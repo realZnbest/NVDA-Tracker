@@ -7,11 +7,11 @@ import { IconBell, IconLedger, IconSignal, IconWallet, IconWave } from "./icons"
 import { NotificationBell } from "./notification-bell";
 import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 
-// Only /financials and /news have a symbol-aware href — they get their own /[symbol]
-// route segment, so the nav link should follow whatever symbol the user is currently
-// looking at instead of always bouncing back to the bare (NVDA) route.
+// /dashboard, /financials, and /news each have their own /[symbol] route segment, so
+// their nav links should follow whatever symbol the user is currently looking at
+// instead of always bouncing back to the bare (NVDA) route.
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave, symbolAware: false },
+  { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave, symbolAware: true },
   { href: "/financials", label: "งบการเงิน", icon: IconLedger, symbolAware: true },
   { href: "/news", label: "ข่าว", icon: IconSignal, symbolAware: true },
   { href: "/portfolio", label: "พอร์ตของฉัน", icon: IconWallet, symbolAware: false },
