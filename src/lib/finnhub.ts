@@ -120,8 +120,15 @@ export interface FinnhubReportedFinancials {
   }>;
 }
 
+/**
+ * TTL is deliberately kept just under the quote header's 7s poll. At 15s the cache, not
+ * the poll, set how often the displayed price could change — two of every three ticks
+ * replayed a cached body, so the number on screen moved every 21s no matter how fast the
+ * client asked. 5s means each tick misses and the header is as live as it looks. Costs
+ * ~8.6 calls/min against a 60/min free tier, with up to 3 keys behind the rotation.
+ */
 export function getQuote(symbol: string) {
-  return fetchFinnhub<FinnhubQuote>("/quote", { symbol }, 15_000);
+  return fetchFinnhub<FinnhubQuote>("/quote", { symbol }, 5_000);
 }
 
 // Note: Finnhub's /stock/candle endpoint is restricted to paid plans.

@@ -140,7 +140,10 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
 
   const result: ExtendedHoursQuote = { session, pre, post };
 
-  extendedCache.set(symbol, { expires: Date.now() + 15_000, data: result });
+  // Matched to getQuote's TTL — both feed the same header row, and the extended-hours
+  // delta is measured against the regular price, so letting one go stale while the other
+  // refreshes would show a delta between two prices sampled seconds apart.
+  extendedCache.set(symbol, { expires: Date.now() + 5_000, data: result });
   return result;
 }
 
