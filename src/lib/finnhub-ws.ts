@@ -16,6 +16,23 @@ const waiters = new Map<string, Set<(tick: Tick) => void>>();
 let socket: WebSocket | null = null;
 let connecting = false;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let lastActivity = Date.now();
+
+/**
+ * Idle TCP connections behind NATs/load balancers can die without ever firing `close`
+ * or `error` — the socket just stops delivering trades while `readyState` still reports
+ * OPEN. Left unchecked that reads as "the market went quiet" for however long the owner
+ * has the tab open, which is a much worse failure mode than a normal reconnect. This
+ * watchdog force-closes a connection that's gone silent so `close` fires and the normal
+ * reconnect path picks it back up.
+ */
+const STALE_AFTER_MS = 45_000;
+setInterval(() => {
+  if (socket && Date.now() - lastActivity > STALE_AFTER_MS) {
+    console.warn("[finnhub-ws] no messages in", STALE_AFTER_MS, "ms — terminating stale connection");
+    socket.terminate();
+  }
+}, 15_000).unref();
 
 function notifyWaiters(symbol: string, tick: Tick) {
   const set = waiters.get(symbol);
@@ -47,12 +64,18 @@ function connect() {
   ws.on("open", () => {
     connecting = false;
     socket = ws;
+    lastActivity = Date.now();
     for (const symbol of subscribed) {
       ws.send(JSON.stringify({ type: "subscribe", symbol }));
     }
   });
 
+  ws.on("ping", () => {
+    lastActivity = Date.now();
+  });
+
   ws.on("message", (raw) => {
+    lastActivity = Date.now();
     let msg: { type?: string; data?: Array<{ s: string; p: number; t: number }> };
     try {
       msg = JSON.parse(raw.toString());
@@ -70,13 +93,14 @@ function connect() {
     }
   });
 
-  const onDown = () => {
+  const onDown = (reason: string) => {
+    console.warn(`[finnhub-ws] connection down (${reason}), reconnecting in 3s`);
     connecting = false;
     socket = null;
     scheduleReconnect();
   };
-  ws.on("close", onDown);
-  ws.on("error", onDown);
+  ws.on("close", (code) => onDown(`close ${code}`));
+  ws.on("error", (err) => onDown(`error ${err.message}`));
 }
 
 /** Idempotent — safe to call on every request for a symbol the dashboard is showing. */
