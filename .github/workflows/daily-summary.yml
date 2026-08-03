@@ -1,0 +1,31 @@
+name: Daily after-market summary
+
+# 23:00 UTC = 06:00 Thailand time (ICT is UTC+7 year-round, no DST — so this one fixed
+# expression is correct in both US DST states, and 23:00 UTC is always after the US close
+# at 20:00 UTC in summer / 21:00 UTC in winter). Mon-Fri UTC fires land on Tue-Sat
+# mornings in Bangkok, covering each Mon-Fri US session.
+#
+# Note: GitHub's scheduled runs are best-effort and can be delayed by several minutes
+# under load — treat 06:00 as "roughly", not a guarantee.
+on:
+  schedule:
+    - cron: "0 23 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger daily summary email
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          # Render free instances sleep when idle and can take ~1 min to wake, so allow a
+          # generous timeout and retry rather than failing on a cold start.
+          curl --fail-with-body \
+               --retry 3 --retry-delay 30 --retry-all-errors \
+               --max-time 300 \
+               -X POST "${APP_BASE_URL%/}/api/daily-summary" \
+               -H "Authorization: Bearer ${CRON_SECRET}"

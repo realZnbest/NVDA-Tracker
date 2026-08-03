@@ -6,7 +6,7 @@ import {
   FinnhubError,
 } from "@/lib/finnhub";
 import { extractAllQuarters } from "@/lib/financial-metrics";
-import { generateSummary, AiError } from "@/lib/ai-provider";
+import { generateSummary, AiError, TONE_INSTRUCTION } from "@/lib/ai-provider";
 import { filterRelevantNews } from "@/lib/news-filter";
 import { SYMBOL } from "@/lib/timeframes";
 
@@ -19,9 +19,6 @@ const cache = new Map<string, { expires: number; text: string }>();
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
-
-const TONE_INSTRUCTION =
-  "โทนเป็นทางการแบบนักวิเคราะห์การลงทุนมืออาชีพ น้ำเสียงเป็นกลาง ไม่แสดงอารมณ์หรือความเห็นส่วนตัว หลีกเลี่ยงคำที่สื่อถึงความตื่นเต้น กังวล หรือดราม่าเกินจริง ใช้ภาษาสุภาพเป็นทางการ เน้นข้อเท็จจริงและตัวเลขอย่างตรงไปตรงมา ลงท้ายประโยคด้วย 'ครับ' ตามความเหมาะสมของหลักไวยากรณ์";
 
 function fmtUsd(v: number | null) {
   if (v === null) return "ไม่มีข้อมูล";

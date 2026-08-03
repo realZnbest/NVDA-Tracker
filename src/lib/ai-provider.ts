@@ -1,5 +1,13 @@
 export class AiError extends Error {}
 
+/**
+ * Shared across every AI-written surface (news/financials summary cards, the daily email
+ * summary) so they all speak in one voice — a reader shouldn't be able to tell which
+ * feature produced a given paragraph.
+ */
+export const TONE_INSTRUCTION =
+  "โทนเป็นทางการแบบนักวิเคราะห์การลงทุนมืออาชีพ น้ำเสียงเป็นกลาง ไม่แสดงอารมณ์หรือความเห็นส่วนตัว หลีกเลี่ยงคำที่สื่อถึงความตื่นเต้น กังวล หรือดราม่าเกินจริง ใช้ภาษาสุภาพเป็นทางการ เน้นข้อเท็จจริงและตัวเลขอย่างตรงไปตรงมา ลงท้ายประโยคด้วย 'ครับ' ตามความเหมาะสมของหลักไวยากรณ์";
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;

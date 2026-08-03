@@ -47,9 +47,26 @@ The break-even line on the price chart and the "ด้านพอร์ต" lin
 - Data provider is Finnhub's free tier (quote, news, financials, analyst recommendation trends — 60 requests/min, cached server-side) plus Yahoo Finance's free chart endpoint (historical candles and pre/post-market prices; Finnhub's own candle and price-target endpoints are paid-only, and an earlier attempt to get price targets from an unofficial Yahoo endpoint was abandoned after it proved permanently rate-limited from Render's IP — see `PRODUCT.md`). Finnhub calls fall back across up to 3 keys (`FINNHUB_API_KEY` + optional `_BACKUP`/`_SECONDARY`) on rate-limit or auth failure, same chain pattern as the AI providers below — only `FINNHUB_API_KEY` is required.
 - The AI summary cards try a chain of providers in order — Gemini keys, then Groq keys, then OpenRouter keys, whichever are configured — falling through to the next one if a key hits its free-tier rate limit. Responses are cached server-side for 1 hour per page. Without any key set, those cards just show a "not configured" message — everything else in the app works fine without it.
 - The AI chat widget (bottom-right on `/dashboard`, public, no auth) shares the exact same provider chain and keys — no separate setup needed. Each reply is grounded with live quote/news/financials context pulled from the same cached Finnhub calls the rest of the dashboard uses. Rate-limited per IP (20 messages/10 min, in-memory — resets on redeploy) and capped at 500 characters per message to keep costs bounded on a public, unauthenticated endpoint. Shows a persistent "not investment advice" disclaimer and fails gracefully with a Thai message if every provider is unavailable.
-- Alerts are stored in Turso and evaluated on a ~90s interval, but only while you're logged in with `ALERTS_PASSWORD` in an open tab (there's no separate scheduled job).
+- Alerts are stored in Turso and evaluated on a ~90s interval, but only while you're logged in with `ALERTS_PASSWORD` in an open tab (there's no scheduled job for *alerts* — the only scheduled job is the daily summary below, which doesn't evaluate alerts).
+- (Optional) A daily after-market summary email — see "Daily summary email" below.
 - (Optional) Set `RESEND_API_KEY` and `ALERT_EMAIL_TO` to also get an email the moment an alert fires, on top of the in-app notification — see `.env.local.example`. Free tier, no card required.
 - See `DESIGN.md` for the visual system and `PRODUCT.md` for product scope.
+
+### Daily summary email
+
+Every weekday morning at ~06:00 Thailand time, `.github/workflows/daily-summary.yml` POSTs to `/api/daily-summary`, which emails you a single after-market digest covering NVDA plus every symbol you hold: full OHLC and volume vs its 20-day average, RSI/MACD/MA20-50-200/Bollinger, support-resistance levels and BOS/CHoCH structure, P/E, P/S, margins, revenue growth, FCF, analyst consensus, an earnings countdown, the top 5 news headlines, and your position (average cost, shares, unrealized P&L in $ and %, distance to break-even, projected P&L at target prices). Those raw numbers are then fed into the same AI provider chain the summary cards use, which writes one Thai narrative tying them together — printed alongside the numbers, under a "ไม่ใช่คำแนะนำการลงทุน" disclaimer. If every AI provider is unavailable, the narrative falls back to the app's own rule-based analysis, so the email always sends.
+
+To enable it:
+
+1. Set `CRON_SECRET` (any long random string, e.g. `openssl rand -hex 32`) in Render's environment, alongside the `RESEND_API_KEY`/`ALERT_EMAIL_TO` the email itself needs.
+2. In the GitHub repo, **Settings → Secrets and variables → Actions**, add two repository secrets:
+   - `APP_BASE_URL` — your Render URL, e.g. `https://nvda-tracker.onrender.com`
+   - `CRON_SECRET` — the exact same value as step 1
+3. Test it without waiting for the cron: the workflow has a **Run workflow** button (Actions tab), or `GET /api/daily-summary` from a logged-in browser session returns the composed email as plain text without sending it.
+
+The schedule is `0 23 * * 1-5` — 23:00 UTC is 06:00 the next day in Thailand (UTC+7, no DST) and is after the US close in both US DST states, so the one expression is correct year-round. Note that GitHub's scheduled runs are best-effort and can drift several minutes late under load.
+
+Without `CRON_SECRET` set, `/api/daily-summary` behaves exactly like every other private route — owner session only — and the workflow just fails with a 401, sending nothing.
 
 ## Deploying to Render.com
 
@@ -63,7 +80,7 @@ The break-even line on the price chart and the "ด้านพอร์ต" lin
    - **Runtime:** Node
    - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npm start`
-4. **Environment variables:** add `FINNHUB_API_KEY`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `ALERTS_PASSWORD` (Environment tab); optionally add `FINNHUB_API_KEY_BACKUP`/`FINNHUB_API_KEY_SECONDARY` for extra fallback quota, any of the AI provider keys from `.env.local.example` for the AI summary cards (`GEMINI_API_KEY` alone is enough, the rest are just extra fallback quota), and/or `RESEND_API_KEY`/`ALERT_EMAIL_TO` for email alerts.
+4. **Environment variables:** add `FINNHUB_API_KEY`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `ALERTS_PASSWORD` (Environment tab); optionally add `FINNHUB_API_KEY_BACKUP`/`FINNHUB_API_KEY_SECONDARY` for extra fallback quota, any of the AI provider keys from `.env.local.example` for the AI summary cards (`GEMINI_API_KEY` alone is enough, the rest are just extra fallback quota), and/or `RESEND_API_KEY`/`ALERT_EMAIL_TO` for email alerts (plus `CRON_SECRET` if you want the daily summary email).
 5. Deploy. First build takes a few minutes.
 
 That's it — no persistent disk needed anymore (Turso lives outside Render entirely), and no code changes needed for any of this; the app reads everything from the environment rather than assuming localhost.

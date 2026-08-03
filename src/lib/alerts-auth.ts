@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 export const ALERTS_AUTH_COOKIE = "nvda_alerts_auth";
@@ -59,4 +59,31 @@ export async function requireAlertsAuth(): Promise<NextResponse | null> {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
   return null;
+}
+
+function constantTimeEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * A scheduled job can't hold the owner's signed cookie — that's a browser artifact — so
+ * routes meant to run unattended accept `Authorization: Bearer $CRON_SECRET` as well.
+ * With CRON_SECRET unset the bearer path can never match, so the route stays exactly as
+ * locked down as requireAlertsAuth() until the secret is deliberately configured.
+ */
+export async function isCronAuthorized(): Promise<boolean> {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const header = (await headers()).get("authorization");
+  if (!header?.startsWith("Bearer ")) return false;
+  return constantTimeEquals(header.slice("Bearer ".length).trim(), secret);
+}
+
+/** Like requireAlertsAuth(), but also lets the scheduled job through via CRON_SECRET. */
+export async function requireOwnerOrCron(): Promise<NextResponse | null> {
+  if ((await isAlertsAuthorized()) || (await isCronAuthorized())) return null;
+  return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 }

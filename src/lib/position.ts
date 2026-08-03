@@ -54,6 +54,16 @@ export function computeAggregatePositionsBySymbol(
   return result;
 }
 
+/**
+ * The target prices a position starts with before you edit them. Lives here rather than
+ * in the projection panel because the daily email summary needs the same list: saved
+ * targets are browser-local (localStorage), so the server can only reason about these
+ * defaults — both surfaces must at least agree on what "default" means.
+ */
+export function defaultTargets(price: number): number[] {
+  return [Math.round(price * 1.1), Math.round(price * 1.25), Math.round(price * 1.5)];
+}
+
 export function computePositionMetrics(
   aggregate: AggregatePosition,
   currentPrice: number

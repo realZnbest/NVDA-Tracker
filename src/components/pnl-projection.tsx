@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   computeAggregatePosition,
   computePositionMetrics,
+  defaultTargets,
   type AggregatePosition,
   type PositionLot,
 } from "@/lib/position";
@@ -14,10 +15,6 @@ import { useAlertsContext } from "./alerts-provider";
 // every other symbol gets its own key so target lists don't bleed across symbols.
 function targetsStorageKey(symbol: string): string {
   return symbol === "NVDA" ? "nvda-pnl-targets" : `pnl-targets:${symbol}`;
-}
-
-function defaultTargets(price: number): number[] {
-  return [Math.round(price * 1.1), Math.round(price * 1.25), Math.round(price * 1.5)];
 }
 
 export function PnlProjectionPanel({ symbol = "NVDA" }: { symbol?: string }) {
