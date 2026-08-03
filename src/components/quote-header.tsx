@@ -55,7 +55,7 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
       .catch(() => setStatus("error"));
   }, [symbol]);
 
-  usePoll(load, 20_000);
+  usePoll(load, 7_000);
 
   const up = quote ? quote.d >= 0 : true;
   const priceColor = up ? "var(--up)" : "var(--down)";
