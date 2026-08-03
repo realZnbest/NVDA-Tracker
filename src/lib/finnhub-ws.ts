@@ -12,9 +12,17 @@ type Tick = { price: number; time: number };
 
 const ticks = new Map<string, Tick>();
 const subscribed = new Set<string>();
+const waiters = new Map<string, Set<(tick: Tick) => void>>();
 let socket: WebSocket | null = null;
 let connecting = false;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function notifyWaiters(symbol: string, tick: Tick) {
+  const set = waiters.get(symbol);
+  if (!set) return;
+  waiters.delete(symbol);
+  for (const resolve of set) resolve(tick);
+}
 
 function primaryKey(): string | undefined {
   return process.env.FINNHUB_API_KEY;
@@ -55,7 +63,9 @@ function connect() {
     for (const trade of msg.data) {
       const prev = ticks.get(trade.s);
       if (!prev || trade.t > prev.time) {
-        ticks.set(trade.s, { price: trade.p, time: trade.t });
+        const tick = { price: trade.p, time: trade.t };
+        ticks.set(trade.s, tick);
+        notifyWaiters(trade.s, tick);
       }
     }
   });
@@ -82,4 +92,31 @@ export function subscribeSymbol(symbol: string) {
 /** Most recent trade print for `symbol`, or null if none has arrived yet this process. */
 export function getLiveTick(symbol: string): Tick | null {
   return ticks.get(symbol) ?? null;
+}
+
+/**
+ * Resolves with a live tick for `symbol`, waiting up to `timeoutMs` for one to arrive if
+ * none has yet — covers the first request right after opening the site (or the first
+ * request for a symbol nobody's viewed this process), where without this the page would
+ * show whatever stale value the REST snapshot happened to have instead of a fresh print.
+ * Every request after that already has a cached tick and returns immediately.
+ */
+export function waitForLiveTick(symbol: string, timeoutMs: number): Promise<Tick | null> {
+  const existing = ticks.get(symbol);
+  if (existing) return Promise.resolve(existing);
+
+  return new Promise((resolve) => {
+    const onTick = (tick: Tick) => {
+      clearTimeout(timer);
+      resolve(tick);
+    };
+    const set = waiters.get(symbol) ?? new Set();
+    set.add(onTick);
+    waiters.set(symbol, set);
+
+    const timer = setTimeout(() => {
+      waiters.get(symbol)?.delete(onTick);
+      resolve(ticks.get(symbol) ?? null);
+    }, timeoutMs);
+  });
 }

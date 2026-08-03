@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getQuote, FinnhubError } from "@/lib/finnhub";
 import { getExtendedHoursQuote } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
-import { subscribeSymbol, getLiveTick } from "@/lib/finnhub-ws";
+import { subscribeSymbol, waitForLiveTick } from "@/lib/finnhub-ws";
 
 export async function GET(request: NextRequest) {
   const symbol = request.nextUrl.searchParams.get("symbol") ?? SYMBOL;
   subscribeSymbol(symbol);
   try {
-    const restQuote = await getQuote(symbol);
+    // Run concurrently: on a warm symbol waitForLiveTick resolves instantly from cache,
+    // so this costs nothing beyond the REST call it's already racing.
+    const [restQuote, tick] = await Promise.all([getQuote(symbol), waitForLiveTick(symbol, 1_500)]);
     // `restQuote` is a shared cache entry (see finnhub.ts) — copy before overlaying a
     // fresher trade print rather than mutating it out from under other callers.
-    const tick = getLiveTick(symbol);
     const quote =
       tick && tick.time > restQuote.t * 1000
         ? {
