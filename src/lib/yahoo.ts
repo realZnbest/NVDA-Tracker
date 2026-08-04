@@ -42,6 +42,11 @@ export interface ExtendedHoursQuote {
   session: MarketSession;
   pre: { price: number; change: number; changePercent: number } | null;
   post: { price: number; change: number; changePercent: number } | null;
+  /** Last official regular-session trade price — frozen outside regular hours (unlike
+   *  the quote route's `c`, which keeps tracking pre/post trade prints all day). This is
+   *  what the header shows as "the" price outside regular hours, with pre/post surfaced
+   *  only in the dedicated extended-hours row. */
+  regularMarketPrice: number;
 }
 
 type CacheEntry = { expires: number; data: FinnhubCandles };
@@ -138,7 +143,7 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
     }
   }
 
-  const result: ExtendedHoursQuote = { session, pre, post };
+  const result: ExtendedHoursQuote = { session, pre, post, regularMarketPrice: regularPrice };
 
   // Matched to getQuote's TTL — both feed the same header row, and the extended-hours
   // delta is measured against the regular price, so letting one go stale while the other

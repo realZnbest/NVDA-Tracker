@@ -57,7 +57,20 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
 
   usePoll(load, 3_000);
 
-  const up = quote ? quote.d >= 0 : true;
+  // Outside regular hours, `quote.c` keeps tracking pre/post trade prints (see
+  // /api/quote), which makes the headline number jump around before/after the bell as
+  // if it were the "real" price. The headline should stay pinned to the last official
+  // regular-session trade; pre/post movement belongs only in the ExtendedRow below.
+  const useRegularPrice = quote && extended && extended.session !== "regular";
+  const mainPrice = useRegularPrice ? extended!.regularMarketPrice : quote?.c;
+  const mainChange = useRegularPrice ? extended!.regularMarketPrice - quote!.pc : quote?.d;
+  const mainChangePercent = useRegularPrice
+    ? quote!.pc
+      ? ((extended!.regularMarketPrice - quote!.pc) / quote!.pc) * 100
+      : 0
+    : quote?.dp;
+
+  const up = mainChange !== undefined ? mainChange >= 0 : true;
   const priceColor = up ? "var(--up)" : "var(--down)";
 
   return (
@@ -109,15 +122,20 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
                 className="telemetry text-4xl font-medium transition-colors"
                 style={{ color: priceColor }}
               >
-                ${quote.c.toFixed(2)}
+                ${mainPrice!.toFixed(2)}
               </span>
               <span
                 className="flex items-center gap-1 telemetry text-sm"
                 style={{ color: priceColor }}
               >
                 {up ? <IconArrowUp className="h-3.5 w-3.5" /> : <IconArrowDown className="h-3.5 w-3.5" />}
-                {Math.abs(quote.d).toFixed(2)} ({quote.dp.toFixed(2)}%)
+                {Math.abs(mainChange!).toFixed(2)} ({mainChangePercent!.toFixed(2)}%)
               </span>
+              {useRegularPrice && (
+                <span className="telemetry text-[10px] text-text-muted">
+                  ราคาปิดตลาดล่าสุด
+                </span>
+              )}
             </div>
 
             <p className="telemetry text-[10px] text-text-muted mt-1">
@@ -133,14 +151,14 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
                   <ExtendedRow
                     label={SESSION_LABEL_TH.pre}
                     price={extended.pre.price}
-                    baseline={quote.c}
+                    baseline={mainPrice!}
                   />
                 )}
                 {extended.post && (
                   <ExtendedRow
                     label={SESSION_LABEL_TH.post}
                     price={extended.post.price}
-                    baseline={quote.c}
+                    baseline={mainPrice!}
                   />
                 )}
               </div>
