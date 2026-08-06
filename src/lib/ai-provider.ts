@@ -13,6 +13,11 @@ export interface ChatMessage {
   content: string;
 }
 
+/** A summary/reply is only useful if it lands before the reader gives up waiting.
+ *  Any provider — including one that's degraded and returning 200s after 30s+ instead
+ *  of failing fast — gets cut off after this so the chain can move to the next key. */
+const PROVIDER_TIMEOUT_MS = 8_000;
+
 interface Attempt {
   name: string;
   call: (messages: ChatMessage[], system?: string) => Promise<string>;
@@ -42,6 +47,7 @@ async function callGemini(
       },
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
   });
   if (!res.ok) throw new AiError(`GEMINI_HTTP_${res.status}`);
   const data = await res.json();
@@ -71,6 +77,7 @@ async function callOpenAiCompatible(
       max_tokens: 1600,
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
   });
   if (!res.ok) throw new AiError(`HTTP_${res.status}`);
   const data = await res.json();
@@ -82,6 +89,25 @@ async function callOpenAiCompatible(
 function buildProviderChain(): Attempt[] {
   const attempts: Attempt[] = [];
 
+  // Groq goes first: it's served on their LPU hardware and reliably answers in well
+  // under a second, whereas Gemini's free tier has been observed swinging between fast
+  // 503s and 30s+ successful responses under load — worth trying only after a snappy
+  // provider has had a shot. Not "openai/gpt-oss-20b" — that's a reasoning model that
+  // burns most of its token budget on hidden chain-of-thought before answering, which
+  // caused real truncated/cut-off summaries (see git history). Llama 3.3 70B is a plain
+  // instruct model, no reasoning tokens, more predictable output length.
+  const groqModel = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
+  const groqKeys = [process.env.GROQ_API_KEY, process.env.GROQ_API_KEY_BACKUP].filter(
+    (k): k is string => Boolean(k)
+  );
+  groqKeys.forEach((key, i) =>
+    attempts.push({
+      name: `groq${i > 0 ? `-${i + 1}` : ""}`,
+      call: (messages, system) =>
+        callOpenAiCompatible("https://api.groq.com/openai/v1/chat/completions", key, groqModel, messages, system),
+    })
+  );
+
   const geminiModel = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
   const geminiKeys = [
     process.env.GEMINI_API_KEY,
@@ -92,22 +118,6 @@ function buildProviderChain(): Attempt[] {
     attempts.push({
       name: `gemini${i > 0 ? `-${i + 1}` : ""}`,
       call: (messages, system) => callGemini(key, geminiModel, messages, system),
-    })
-  );
-
-  // Not "openai/gpt-oss-20b" — that's a reasoning model that burns most of its token
-  // budget on hidden chain-of-thought before answering, which caused real truncated/cut-off
-  // summaries (see git history). Llama 3.3 70B is a plain instruct model, no reasoning
-  // tokens, more predictable output length.
-  const groqModel = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
-  const groqKeys = [process.env.GROQ_API_KEY, process.env.GROQ_API_KEY_BACKUP].filter(
-    (k): k is string => Boolean(k)
-  );
-  groqKeys.forEach((key, i) =>
-    attempts.push({
-      name: `groq${i > 0 ? `-${i + 1}` : ""}`,
-      call: (messages, system) =>
-        callOpenAiCompatible("https://api.groq.com/openai/v1/chat/completions", key, groqModel, messages, system),
     })
   );
 
