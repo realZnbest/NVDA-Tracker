@@ -24,7 +24,11 @@ export interface Timeframe {
 
 export const TIMEFRAMES: Timeframe[] = [
   // Yahoo hard limit: 60m/1h bars are only available for the last 730 days.
-  { key: "1H", label: "1 ชั่วโมง", yahooRange: "2y", yahooInterval: "60m", scopeDays: 5 },
+  // scopeDays counts calendar days, and weekends carry no bars — 5 calendar days can
+  // collapse to as few as 3 trading sessions (~22 hourly bars), rendering as a handful
+  // of fat, sparse candles. 10 keeps a comfortable ~2 trading weeks of bars regardless
+  // of where the current day falls in the week.
+  { key: "1H", label: "1 ชั่วโมง", yahooRange: "2y", yahooInterval: "60m", scopeDays: 10 },
   // Yahoo hard limit: 5m bars are only available for roughly the last 60 days.
   { key: "1D", label: "1 วัน", yahooRange: "60d", yahooInterval: "5m", scopeDays: 1 },
   { key: "5D", label: "5 วัน", yahooRange: "60d", yahooInterval: "30m", scopeDays: 5 },
