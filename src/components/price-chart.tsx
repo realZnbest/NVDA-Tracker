@@ -118,6 +118,9 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
   const [avgCost, setAvgCost] = useState<number | null>(null);
 
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
+  /** Timeframe the loaded `candles` were fetched for — lets the scoping effect below tell
+   *  fresh data apart from a still-in-flight timeframe switch's stale previous data. */
+  const [candlesTimeframe, setCandlesTimeframe] = useState<TimeframeKey | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [storedParams, setParams] = usePersistentState<Params>("nvda.chart.params", DEFAULT_PARAMS);
@@ -188,6 +191,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
             return;
           }
           setCandles(data.candles);
+          setCandlesTimeframe(timeframe);
           setUpdatedAt(Date.now());
           setStatus("ready");
         })
@@ -466,6 +470,10 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
   // something.
   useEffect(() => {
     if (!candles || !chartRef.current) return;
+    // Candles from the previous timeframe's fetch can still be in state while the new
+    // timeframe's request is in flight — scoping against them would lock in a visible
+    // range computed for the wrong bar density, so wait for the matching fetch to land.
+    if (candlesTimeframe !== timeframe) return;
     const times = candles.t;
     if (times.length === 0) return;
     if (scopedRef.current === timeframe) return;
@@ -487,7 +495,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
       from: Math.max(fromTime, times[0]) as UTCTimestamp,
       to: lastTime as UTCTimestamp,
     });
-  }, [candles, timeframe]);
+  }, [candles, candlesTimeframe, timeframe]);
 
   // Crosshair readout: the bar under the cursor, falling back to the most recent bar when
   // the pointer is off the chart — so the strip always reads something, the way a real
