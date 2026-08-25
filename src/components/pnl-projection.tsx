@@ -40,7 +40,7 @@ export function PnlProjectionPanel({ symbol = "NVDA" }: { symbol?: string }) {
   }, [authStatus, symbol]);
 
   // Target prices are saved to localStorage (client-side, not server state), so a page
-  // refresh — or a Render redeploy, which only ever affects the server — never loses them.
+  // refresh — or a server redeploy, which only ever affects the server — never loses them.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when switching symbols so stale targets don't flash
     setTargetsLoaded(false);

@@ -16,6 +16,10 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 // Keyed by "type:symbol" so AAPL's cached summary never serves NVDA's, or vice versa.
 const cache = new Map<string, { expires: number; text: string }>();
 
+// Same reasoning as /api/chat — the provider chain needs headroom beyond the default
+// when early keys are rate-limited and the request falls through several of them.
+export const maxDuration = 60;
+
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }

@@ -6,7 +6,7 @@ A personal NVIDIA (NVDA) analysis dashboard: candlestick price chart with RSI/MA
 
 1. Get a free API key at [finnhub.io/register](https://finnhub.io/register) (no card required).
 2. (Optional, for the "สรุปโดย AI" summary cards) Get a free Gemini API key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
-3. (Required for alerts to survive a Render redeploy) Set up Turso — see below.
+3. (Required for alerts to survive a redeploy) Set up Turso — see below.
 4. (Required to view/manage alerts) Set `ALERTS_PASSWORD` to any password of your choosing — the site is public, so alerts/notifications are locked behind this.
 5. Copy `.env.local.example` to `.env.local` and paste your key(s):
    ```bash
@@ -21,7 +21,7 @@ A personal NVIDIA (NVDA) analysis dashboard: candlestick price chart with RSI/MA
 
 ### Setting up Turso (alert storage)
 
-Render's filesystem is ephemeral — a local SQLite file resets on every deploy, which means any alerts you'd created disappear. Turso is a hosted, SQLite-compatible database with a generous free tier and no project-count cap, so alerts persist independently of the app's own filesystem.
+Serverless hosts have an ephemeral filesystem — a local SQLite file resets on every deploy (and often between invocations), which means any alerts you'd created disappear. Turso is a hosted, SQLite-compatible database with a generous free tier and no project-count cap, so alerts persist independently of the app's own filesystem.
 
 1. Sign up free at [turso.tech](https://turso.tech).
 2. **Create Database** (any name, any region).
@@ -44,7 +44,7 @@ The break-even line on the price chart and the "ด้านพอร์ต" lin
 
 - The chart remembers your workspace: timeframe, which indicators are on, and their periods are stored in your browser and restored on the next visit (reset them from the "ตัวชี้วัด" popover). Hovering the chart drives a readout strip showing that bar's O/H/L/C, change, volume, RSI and MACD; move the pointer away and it falls back to the latest bar.
 - Price, comparison chart and quote refresh themselves on a timer while the tab is open — silently, so a zoom or pan is never reset — and pause entirely while the tab is in the background, refreshing the moment you come back.
-- Data provider is Finnhub's free tier (quote, news, financials, analyst recommendation trends — 60 requests/min, cached server-side) plus Yahoo Finance's free chart endpoint (historical candles and pre/post-market prices; Finnhub's own candle and price-target endpoints are paid-only, and an earlier attempt to get price targets from an unofficial Yahoo endpoint was abandoned after it proved permanently rate-limited from Render's IP — see `PRODUCT.md`). Finnhub calls fall back across up to 3 keys (`FINNHUB_API_KEY` + optional `_BACKUP`/`_SECONDARY`) on rate-limit or auth failure, same chain pattern as the AI providers below — only `FINNHUB_API_KEY` is required.
+- Data provider is Finnhub's free tier (quote, news, financials, analyst recommendation trends — 60 requests/min, cached server-side) plus Yahoo Finance's free chart endpoint (historical candles and pre/post-market prices; Finnhub's own candle and price-target endpoints are paid-only, and an earlier attempt to get price targets from an unofficial Yahoo endpoint was abandoned after it proved permanently rate-limited from shared datacenter IPs — see `PRODUCT.md`). Finnhub calls fall back across up to 3 keys (`FINNHUB_API_KEY` + optional `_BACKUP`/`_SECONDARY`) on rate-limit or auth failure, same chain pattern as the AI providers below — only `FINNHUB_API_KEY` is required.
 - The AI summary cards try a chain of providers in order — Gemini keys, then Groq keys, then OpenRouter keys, whichever are configured — falling through to the next one if a key hits its free-tier rate limit. Responses are cached server-side for 1 hour per page. Without any key set, those cards just show a "not configured" message — everything else in the app works fine without it.
 - The AI chat widget (bottom-right on `/dashboard`, public, no auth) shares the exact same provider chain and keys — no separate setup needed. Each reply is grounded with live quote/news/financials context pulled from the same cached Finnhub calls the rest of the dashboard uses. Rate-limited per IP (20 messages/10 min, in-memory — resets on redeploy) and capped at 500 characters per message to keep costs bounded on a public, unauthenticated endpoint. Shows a persistent "not investment advice" disclaimer and fails gracefully with a Thai message if every provider is unavailable.
 - Alerts are stored in Turso and evaluated on a ~90s interval, but only while you're logged in with `ALERTS_PASSWORD` in an open tab (there's no scheduled job for *alerts* — the only scheduled job is the daily summary below, which doesn't evaluate alerts).
@@ -58,9 +58,9 @@ Every weekday morning at ~06:00 Thailand time, `.github/workflows/daily-summary.
 
 To enable it:
 
-1. Set `CRON_SECRET` (any long random string, e.g. `openssl rand -hex 32`) in Render's environment, alongside the `RESEND_API_KEY`/`ALERT_EMAIL_TO` the email itself needs.
+1. Set `CRON_SECRET` (any long random string, e.g. `openssl rand -hex 32`) in your hosting provider's environment (on Vercel: Project → Settings → Environment Variables), alongside the `RESEND_API_KEY`/`ALERT_EMAIL_TO` the email itself needs.
 2. In the GitHub repo, **Settings → Secrets and variables → Actions**, add two repository secrets:
-   - `APP_BASE_URL` — your Render URL, e.g. `https://nvda-tracker.onrender.com`
+   - `APP_BASE_URL` — your deployed URL, e.g. `https://nvda-tracker.vercel.app`
    - `CRON_SECRET` — the exact same value as step 1
 3. Test it without waiting for the cron: the workflow has a **Run workflow** button (Actions tab), or `GET /api/daily-summary` from a logged-in browser session returns the composed email as plain text without sending it.
 
@@ -68,19 +68,24 @@ The schedule is `0 23 * * 1-5` — 23:00 UTC is 06:00 the next day in Thailand (
 
 Without `CRON_SECRET` set, `/api/daily-summary` behaves exactly like every other private route — owner session only — and the workflow just fails with a 401, sending nothing.
 
-## Deploying to Render.com
+## Deploying to Vercel (free)
 
-1. **Push this repo to GitHub** (Render deploys from a git repo):
+[Vercel](https://vercel.com)'s Hobby plan is free, requires no card, and is made by the Next.js team — the repo deploys with zero configuration.
+
+1. **Push this repo to GitHub** (Vercel deploys from a git repo):
    ```bash
    git remote add origin <your-empty-github-repo-url>
    git push -u origin main
    ```
-2. On [render.com](https://render.com), **New → Web Service**, connect the GitHub repo.
-3. Settings:
-   - **Runtime:** Node
-   - **Build Command:** `npm install && npm run build`
-   - **Start Command:** `npm start`
-4. **Environment variables:** add `FINNHUB_API_KEY`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `ALERTS_PASSWORD` (Environment tab); optionally add `FINNHUB_API_KEY_BACKUP`/`FINNHUB_API_KEY_SECONDARY` for extra fallback quota, any of the AI provider keys from `.env.local.example` for the AI summary cards (`GEMINI_API_KEY` alone is enough, the rest are just extra fallback quota), and/or `RESEND_API_KEY`/`ALERT_EMAIL_TO` for email alerts (plus `CRON_SECRET` if you want the daily summary email).
-5. Deploy. First build takes a few minutes.
+2. On [vercel.com](https://vercel.com), sign up and **Add New → Project**, then import the GitHub repo. Leave all build settings at their defaults (`npm run build` / Next.js is auto-detected) and deploy.
+3. **Environment variables:** in Project → Settings → Environment Variables, add `FINNHUB_API_KEY`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `ALERTS_PASSWORD`; optionally add `FINNHUB_API_KEY_BACKUP`/`FINNHUB_API_KEY_SECONDARY` for extra fallback quota, any of the AI provider keys from `.env.local.example` for the AI summary cards (`GEMINI_API_KEY` alone is enough, the rest are just extra fallback quota), and/or `RESEND_API_KEY`/`ALERT_EMAIL_TO` for email alerts (plus `CRON_SECRET` if you want the daily summary email). Redeploy after adding them so they take effect.
+4. If you use the daily summary email, update the `APP_BASE_URL` GitHub secret to your Vercel URL (e.g. `https://nvda-tracker.vercel.app`) — see "Daily summary email" above.
 
-That's it — no persistent disk needed anymore (Turso lives outside Render entirely), and no code changes needed for any of this; the app reads everything from the environment rather than assuming localhost.
+That's it — no persistent disk needed (Turso lives outside the app entirely), and no code changes were needed for any of this; the app reads everything from the environment rather than assuming localhost.
+
+### Vercel-specific notes
+
+- The Hobby plan is for personal, non-commercial use — exactly what this dashboard is.
+- Instances are short-lived serverless functions: in-memory caches (Finnhub responses, AI summaries, chat rate limits) reset more often than on a traditional host, which just means an occasional extra upstream call — behavior is otherwise identical.
+- The Finnhub trade websocket (`src/lib/finnhub-ws.ts`) keeps a persistent connection per process to shave 20-30s of lag off quotes; on serverless those processes come and go, so most requests fall back to the REST snapshot quote (the code already handles this gracefully — it's a freshness regression during market hours, not a breakage).
+- Long-running routes export `maxDuration = 60` (`/api/daily-summary`, `/api/chat`, `/api/ai-summary`), which fits comfortably inside the Hobby limit.

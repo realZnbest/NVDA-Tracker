@@ -10,6 +10,10 @@ import { filterRelevantNews } from "@/lib/news-filter";
 import { SYMBOL } from "@/lib/timeframes";
 import { getAnalysisRead } from "@/lib/analysis";
 
+// The provider chain can burn 8s per key before falling through to the next one — a
+// cold instance with every key rate-limited needs well beyond the platform default.
+export const maxDuration = 60;
+
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX = 20;
 const MAX_MESSAGE_LENGTH = 500;

@@ -22,8 +22,8 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          # Render free instances sleep when idle and can take ~1 min to wake, so allow a
-          # generous timeout and retry rather than failing on a cold start.
+          # Retries cover transient failures (cold start, upstream data provider hiccup);
+          # the endpoint itself takes well under the 300s cap.
           curl --fail-with-body \
                --retry 3 --retry-delay 30 --retry-all-errors \
                --max-time 300 \

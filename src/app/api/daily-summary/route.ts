@@ -3,6 +3,10 @@ import { requireOwnerOrCron } from "@/lib/alerts-auth";
 import { buildDailySummaryEmail } from "@/lib/daily-summary";
 import { sendAlertEmail } from "@/lib/email";
 
+// Composing the email fans out across every data provider plus the AI chain, and on a
+// cold serverless instance none of those caches are warm — 60s covers the worst case.
+export const maxDuration = 60;
+
 /**
  * The after-market daily digest, triggered by the GitHub Actions cron at 23:00 UTC
  * (06:00 Thailand time). POST — same shape and gating philosophy as /api/alerts/check,
