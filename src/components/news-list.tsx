@@ -51,7 +51,7 @@ export function NewsList({ symbol = "NVDA" }: { symbol?: string }) {
           className={`group flex gap-4 px-1 py-4 ${i !== 0 ? "border-t border-seam" : ""}`}
         >
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5 telemetry text-[10px] text-text-muted">
+            <div className="flex items-center gap-2 mb-1.5 telemetry text-[0.625rem] text-text-muted">
               <span className="text-ch-price">{item.source}</span>
               <span>·</span>
               <time>{new Date(item.datetime * 1000).toLocaleString("th-TH")}</time>

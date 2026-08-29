@@ -11,13 +11,13 @@ export default async function PortfolioSymbolPage({
   const symbol = rawSymbol.toUpperCase();
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
+    <div className="page-container-reading flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <Link href="/portfolio" className="text-sm text-text-muted hover:text-text-primary transition-colors">
           พอร์ตของฉัน
         </Link>
         <span className="text-sm text-text-muted">/</span>
-        <h1 className="text-lg font-medium text-text-primary">{symbol}</h1>
+        <h1 className="text-display-headline font-medium text-text-primary">{symbol}</h1>
       </div>
       <PositionPanel symbol={symbol} />
       <PnlProjectionPanel symbol={symbol} />

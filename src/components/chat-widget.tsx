@@ -70,7 +70,7 @@ export function ChatWidget({ symbol }: { symbol: string }) {
           </div>
 
           <div className="border-b border-seam bg-ch-alert-dim/40 px-4 py-2">
-            <p className="text-[11px] font-medium leading-relaxed text-ch-alert">
+            <p className="text-[0.6875rem] font-medium leading-relaxed text-ch-alert">
               คำตอบจาก AI อาจไม่ถูกต้องหรือไม่เป็นปัจจุบัน ไม่ใช่คำแนะนำการลงทุน
               โปรดตรวจสอบข้อมูลก่อนตัดสินใจ
             </p>

@@ -213,7 +213,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
           <span className="module-label">ประวัติการซื้อ ({lots.length})</span>
           <button
             onClick={() => logout()}
-            className="text-[11px] text-text-muted hover:text-text-primary transition-colors"
+            className="text-[0.6875rem] text-text-muted hover:text-text-primary transition-colors"
           >
             ออกจากระบบ
           </button>
@@ -253,13 +253,13 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
                   />
                   <button
                     onClick={() => handleSaveEdit(lot.id)}
-                    className="telemetry text-[11px] rounded px-2 py-1 text-up bg-up/10"
+                    className="telemetry text-[0.6875rem] rounded px-2 py-1 text-up bg-up/10"
                   >
                     บันทึก
                   </button>
                   <button
                     onClick={() => setEditingId(null)}
-                    className="telemetry text-[11px] rounded px-2 py-1 text-text-muted bg-white/5"
+                    className="telemetry text-[0.6875rem] rounded px-2 py-1 text-text-muted bg-white/5"
                   >
                     ยกเลิก
                   </button>
@@ -274,21 +274,21 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
                       {lot.shares.toLocaleString()} หุ้น
                       <span className="telemetry text-text-secondary"> · ${lot.pricePerShare.toFixed(2)}</span>
                     </p>
-                    <p className="telemetry text-[10px] text-text-muted">{toDisplayDate(lot.purchaseDate)}</p>
+                    <p className="telemetry text-[0.625rem] text-text-muted">{toDisplayDate(lot.purchaseDate)}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     {confirmDeleteId === lot.id ? (
                       <>
-                        <span className="text-[11px] text-text-muted">ลบรายการนี้?</span>
+                        <span className="text-[0.6875rem] text-text-muted">ลบรายการนี้?</span>
                         <button
                           onClick={() => handleDelete(lot.id)}
-                          className="telemetry text-[11px] rounded px-2 py-1 text-ch-alert bg-ch-alert/10 hover:brightness-125"
+                          className="telemetry text-[0.6875rem] rounded px-2 py-1 text-ch-alert bg-ch-alert/10 hover:brightness-125"
                         >
                           ยืนยันลบ
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(null)}
-                          className="telemetry text-[11px] rounded px-2 py-1 text-text-muted bg-white/5"
+                          className="telemetry text-[0.6875rem] rounded px-2 py-1 text-text-muted bg-white/5"
                         >
                           ยกเลิก
                         </button>
@@ -297,7 +297,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
                       <>
                         <button
                           onClick={() => startEdit(lot)}
-                          className="telemetry text-[11px] rounded px-2 py-1 text-text-muted bg-white/5 hover:text-text-primary"
+                          className="telemetry text-[0.6875rem] rounded px-2 py-1 text-text-muted bg-white/5 hover:text-text-primary"
                         >
                           แก้ไข
                         </button>

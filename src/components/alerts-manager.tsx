@@ -227,7 +227,7 @@ function AlertGroup({
         </span>
         <button
           onClick={onLogout}
-          className="text-[11px] text-text-muted hover:text-text-primary transition-colors"
+          className="text-[0.6875rem] text-text-muted hover:text-text-primary transition-colors"
         >
           ออกจากระบบ
         </button>
@@ -253,7 +253,7 @@ function AlertGroup({
                     <span className="telemetry text-text-secondary"> · {a.threshold}</span>
                   )}
                 </p>
-                <p className="telemetry text-[10px] text-text-muted">
+                <p className="telemetry text-[0.625rem] text-text-muted">
                   {a.lastTriggeredAt
                     ? `ทริกเกอร์ล่าสุด ${new Date(a.lastTriggeredAt).toLocaleString("th-TH")}`
                     : "ยังไม่เคยทริกเกอร์"}
@@ -263,7 +263,7 @@ function AlertGroup({
             <div className="flex items-center gap-3 shrink-0">
               <button
                 onClick={() => onToggle(a)}
-                className={`telemetry text-[11px] rounded px-2 py-1 ${
+                className={`telemetry text-[0.6875rem] rounded px-2 py-1 ${
                   a.active ? "text-up bg-up/10" : "text-text-muted bg-white/5"
                 }`}
               >

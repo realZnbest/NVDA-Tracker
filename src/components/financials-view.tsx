@@ -83,7 +83,7 @@ export function FinancialsView({ symbol = "NVDA" }: { symbol?: string }) {
       <div className="module overflow-x-auto scrollbar-thin p-1">
         <table className="w-full min-w-[720px] telemetry text-xs">
           <thead>
-            <tr className="text-text-muted text-[10px] border-b border-seam">
+            <tr className="text-text-muted text-[0.625rem] border-b border-seam">
               <th className="text-left font-normal py-2 px-3">งวด</th>
               <th className="text-right font-normal py-2 px-3">รายได้</th>
               <th className="text-right font-normal py-2 px-3">กำไรสุทธิ</th>

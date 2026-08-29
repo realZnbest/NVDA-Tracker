@@ -172,7 +172,7 @@ export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timefram
         <span className="module-label">
           เทียบกับตลาดรวม <span className="telemetry text-ch-price">· {timeframe}</span>
         </span>
-        <div className="flex items-center gap-4 text-[11px]">
+        <div className="flex items-center gap-4 text-[0.6875rem]">
           <Legend label={symbol} color={CH.price} value={nvdaChange} />
           <Legend label="S&P 500" color={CH.benchmark} value={sp500Change} />
           <Legend label="NASDAQ 100" color={CH.nasdaq} value={nasdaqChange} />
@@ -185,7 +185,7 @@ export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timefram
       )}
       {status === "error" && <p className="text-sm text-text-muted px-4 py-6">โหลดข้อมูลไม่สำเร็จ</p>}
 
-      <div ref={containerRef} className="h-60 w-full" />
+      <div ref={containerRef} className="w-full" style={{ height: "clamp(240px, 13vw, 420px)" }} />
 
       {status === "ready" && nvdaChange !== null && sp500Change !== null && nasdaqChange !== null && (
         <ComparisonSummary symbol={symbol} nvda={nvdaChange} sp500={sp500Change} nasdaq={nasdaqChange} />

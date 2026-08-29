@@ -118,7 +118,7 @@ export function PnlProjectionPanel({ symbol = "NVDA" }: { symbol?: string }) {
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="telemetry text-[10px] text-text-muted">
+            <tr className="telemetry text-[0.625rem] text-text-muted">
               <th className="text-left font-normal px-4 py-2">ราคาเป้าหมาย</th>
               <th className="text-right font-normal px-4 py-2">มูลค่าพอร์ต ณ ราคานี้</th>
               <th className="text-right font-normal px-4 py-2">กำไร/ขาดทุนจากราคาปัจจุบัน</th>

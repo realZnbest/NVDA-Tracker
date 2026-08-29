@@ -22,7 +22,7 @@ export function NotificationBell({ className }: { className?: string }) {
       >
         <IconBell className="h-4 w-4" />
         {authed && unreadCount > 0 && (
-          <span className="telemetry rounded-full bg-ch-alert px-1 text-[9px] leading-4 text-bg">
+          <span className="telemetry rounded-full bg-ch-alert px-1 text-[0.5625rem] leading-4 text-bg">
             {unreadCount}
           </span>
         )}
@@ -47,7 +47,7 @@ export function NotificationBell({ className }: { className?: string }) {
                   {notifications.map((n) => (
                     <li key={n.id} className="border-t border-seam/60 pt-2 first:border-t-0 first:pt-0">
                       <p className="text-xs text-text-primary leading-relaxed">{n.message}</p>
-                      <p className="telemetry text-[10px] text-text-muted mt-1">
+                      <p className="telemetry text-[0.625rem] text-text-muted mt-1">
                         {new Date(n.createdAt).toLocaleString("th-TH")}
                       </p>
                     </li>

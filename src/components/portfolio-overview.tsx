@@ -89,7 +89,7 @@ export function PortfolioOverview() {
           <span className="module-label">โพซิชันที่เปิดอยู่ ({rows.length})</span>
           <button
             onClick={() => setShowAddForm((v) => !v)}
-            className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
+            className="flex items-center gap-1.5 text-[0.6875rem] text-text-muted hover:text-text-primary transition-colors"
           >
             <IconPlus className="h-3.5 w-3.5" />
             เพิ่มโพซิชันใหม่
@@ -142,17 +142,17 @@ function SymbolRowItem({ row }: { row: SymbolRow }) {
       >
         <div className="min-w-0">
           <p className="text-sm text-text-primary font-medium">{symbol}</p>
-          <p className="telemetry text-[11px] text-text-muted">
+          <p className="telemetry text-[0.6875rem] text-text-muted">
             {aggregate.totalShares.toLocaleString()} หุ้น · ต้นทุนเฉลี่ย ${aggregate.avgCost.toFixed(2)}
           </p>
         </div>
         <div className="flex items-center gap-6 telemetry text-sm">
           <div className="text-right">
-            <p className="text-text-secondary text-[10px]">มูลค่าปัจจุบัน</p>
+            <p className="text-text-secondary text-[0.625rem]">มูลค่าปัจจุบัน</p>
             <p className="text-text-primary">{value !== null ? `$${value.toFixed(2)}` : "—"}</p>
           </div>
           <div className="text-right min-w-[110px]">
-            <p className="text-text-secondary text-[10px]">กำไร/ขาดทุน</p>
+            <p className="text-text-secondary text-[0.625rem]">กำไร/ขาดทุน</p>
             <p style={{ color: pnl !== null ? (up ? "var(--up)" : "var(--down)") : undefined }}>
               {pnl !== null && pnlPercent !== null
                 ? `${up ? "+" : ""}$${pnl.toFixed(2)} (${up ? "+" : ""}${pnlPercent.toFixed(2)}%)`

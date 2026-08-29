@@ -39,7 +39,7 @@ export function TrendBars({
           );
         })}
       </svg>
-      <div className="flex justify-between telemetry text-[9px] text-text-muted mt-1">
+      <div className="flex justify-between telemetry text-[0.5625rem] text-text-muted mt-1">
         <span>{data[0]?.label}</span>
         <span>{data[data.length - 1]?.label}</span>
       </div>

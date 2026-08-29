@@ -576,7 +576,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
             <button
               key={tf.key}
               onClick={() => onTimeframeChange(tf.key)}
-              className={`telemetry rounded px-2 py-1 text-[11px] transition-colors ${
+              className={`telemetry rounded px-2 py-1 text-[0.6875rem] transition-colors ${
                 timeframe === tf.key
                   ? "bg-ch-price-dim text-ch-price"
                   : "text-text-muted hover:text-text-secondary"
@@ -587,7 +587,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-[11px]">
+        <div className="flex flex-wrap items-center gap-3 text-[0.6875rem]">
           <Toggle label={`MA${params.ma1}`} color={CH.price} active={showMa1} onClick={() => toggleLayer("ma1")} />
           <Toggle label={`MA${params.ma2}`} color="#8fb8ff" active={showMa2} onClick={() => toggleLayer("ma2")} />
           <Toggle label={`MA${params.ma3}`} color="#ff9f6e" active={showMa3} onClick={() => toggleLayer("ma3")} />
@@ -599,7 +599,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
           <Toggle label="BOS/CHoCH" color={CH.choch} active={showStructure} onClick={() => toggleLayer("structure")} />
         </div>
 
-        <div ref={settingsRef} className="ml-auto text-[11px] text-text-muted">
+        <div ref={settingsRef} className="ml-auto text-[0.6875rem] text-text-muted">
           <button
             type="button"
             onClick={() => setSettingsOpen((v) => !v)}
@@ -625,7 +625,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
                   setParams(DEFAULT_PARAMS);
                   setLayers(DEFAULT_LAYERS);
                 }}
-                className="mt-1 rounded border border-seam px-2 py-1 text-[11px] text-text-muted transition-colors hover:text-text-primary"
+                className="mt-1 rounded border border-seam px-2 py-1 text-[0.6875rem] text-text-muted transition-colors hover:text-text-primary"
               >
                 คืนค่าเริ่มต้น
               </button>
@@ -635,7 +635,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
       </div>
 
       {readout && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-seam/60 px-4 py-1.5 telemetry text-[11px]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-seam/60 px-4 py-1.5 telemetry text-[0.6875rem]">
           <span className="text-text-muted">
             {formatBarTime(readout.time, timeframe)}
             {readout.live && <span className="ml-1.5 text-ch-price">· ล่าสุด</span>}
@@ -663,7 +663,10 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
         </div>
       )}
 
-      <div className="relative" style={{ height: 200 + panesVisible * 130 }}>
+      <div
+        className="relative"
+        style={{ height: `calc(clamp(200px, 7.5vw, 420px) + ${panesVisible} * clamp(118px, 4vw, 176px))` }}
+      >
         <div ref={containerRef} className="absolute inset-0" />
         {status === "loading" && <ChartOverlay text="กำลังโหลดข้อมูลราคา…" />}
         {status === "no_key" && (

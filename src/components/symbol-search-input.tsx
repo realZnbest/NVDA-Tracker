@@ -144,7 +144,7 @@ export function SymbolSearchInput({
                     }`}
                   >
                     <span className="truncate">{r.description}</span>
-                    <span className="telemetry shrink-0 text-[11px] text-ch-price">{r.symbol}</span>
+                    <span className="telemetry shrink-0 text-[0.6875rem] text-ch-price">{r.symbol}</span>
                   </button>
                 </li>
               ))}

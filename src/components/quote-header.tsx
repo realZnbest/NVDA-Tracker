@@ -85,10 +85,10 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
     >
       <div className="w-full sm:w-auto">
         <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 mb-2">
-          <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-text-primary whitespace-nowrap">
+          <h1 className="text-display-headline font-semibold tracking-tight text-text-primary whitespace-nowrap">
             {symbol === "NVDA" ? "NVIDIA CORPORATION" : symbol}
           </h1>
-          <span className="telemetry rounded px-2 py-0.5 text-[11px] bg-ch-price-dim text-ch-price whitespace-nowrap">
+          <span className="telemetry rounded px-2 py-0.5 text-[0.6875rem] bg-ch-price-dim text-ch-price whitespace-nowrap">
             NASDAQ · {symbol}
           </span>
           <div className="ml-auto flex flex-col items-end gap-1 sm:hidden">
@@ -119,7 +119,7 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
           <>
             <div className="flex items-baseline gap-3">
               <span
-                className="telemetry text-4xl font-medium transition-colors"
+                className="telemetry text-display-price font-medium leading-none transition-colors"
                 style={{ color: priceColor }}
               >
                 ${mainPrice!.toFixed(2)}
@@ -132,13 +132,13 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
                 {Math.abs(mainChange!).toFixed(2)} ({mainChangePercent!.toFixed(2)}%)
               </span>
               {useRegularPrice && (
-                <span className="telemetry text-[10px] text-text-muted">
+                <span className="telemetry text-[0.625rem] text-text-muted">
                   ราคาปิดตลาดล่าสุด
                 </span>
               )}
             </div>
 
-            <p className="telemetry text-[10px] text-text-muted mt-1">
+            <p className="telemetry text-[0.625rem] text-text-muted mt-1">
               ข้อมูล ณ {new Date(quote.t * 1000).toLocaleString("th-TH", {
                 dateStyle: "medium",
                 timeStyle: "medium",
@@ -171,7 +171,7 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
         ) : status === "error" ? (
           <p className="text-sm text-text-muted">โหลดราคาล่าสุดไม่สำเร็จ</p>
         ) : (
-          <span className="telemetry text-4xl font-medium text-text-muted">— . — —</span>
+          <span className="telemetry text-display-price font-medium leading-none text-text-muted">— . — —</span>
         )}
       </div>
 
@@ -231,7 +231,7 @@ function ExtendedRow({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col items-end">
-      <span className="text-text-muted text-[10px]">{label}</span>
+      <span className="text-text-muted text-[0.625rem]">{label}</span>
       <span>{value}</span>
     </div>
   );

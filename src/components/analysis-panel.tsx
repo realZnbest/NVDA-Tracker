@@ -75,7 +75,7 @@ export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string;
         <div className="module-label">บทวิเคราะห์สังเคราะห์ (Rule-based)</div>
         {status === "ready" && read && (
           <span
-            className="telemetry text-[11px] rounded px-2 py-0.5"
+            className="telemetry text-[0.6875rem] rounded px-2 py-0.5"
             style={{
               color: VERDICT_TH[read.verdict].color,
               background: "rgba(255,255,255,0.04)",
@@ -97,7 +97,7 @@ export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string;
           <p className="text-sm text-text-secondary leading-relaxed">{read.verdictText}</p>
 
           <div>
-            <div className="telemetry text-[10px] text-ch-rsi mb-1.5">ด้านเทคนิค</div>
+            <div className="telemetry text-[0.625rem] text-ch-rsi mb-1.5">ด้านเทคนิค</div>
             <ul className="flex flex-col gap-1.5">
               {read.technical.map((line, i) => (
                 <li key={i} className="text-xs text-text-secondary leading-relaxed pl-3 relative before:content-['·'] before:absolute before:left-0 before:text-ch-rsi">
@@ -108,7 +108,7 @@ export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string;
           </div>
 
           <div>
-            <div className="telemetry text-[10px] text-ch-macd mb-1.5">ด้านปัจจัยพื้นฐาน</div>
+            <div className="telemetry text-[0.625rem] text-ch-macd mb-1.5">ด้านปัจจัยพื้นฐาน</div>
             <ul className="flex flex-col gap-1.5">
               {read.fundamental.map((line, i) => (
                 <li key={i} className="text-xs text-text-secondary leading-relaxed pl-3 relative before:content-['·'] before:absolute before:left-0 before:text-ch-macd">
@@ -120,7 +120,7 @@ export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string;
 
           {positionLine && (
             <div>
-              <div className="telemetry text-[10px] mb-1.5" style={{ color: "#f2c879" }}>
+              <div className="telemetry text-[0.625rem] mb-1.5" style={{ color: "#f2c879" }}>
                 ด้านพอร์ตของคุณ
               </div>
               <ul className="flex flex-col gap-1.5">
@@ -131,7 +131,7 @@ export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string;
             </div>
           )}
 
-          <p className="text-[10px] text-text-muted border-t border-seam pt-2">
+          <p className="text-[0.625rem] text-text-muted border-t border-seam pt-2">
             บทวิเคราะห์นี้สร้างจากกฎที่ตั้งไว้ล่วงหน้า ไม่ใช่คำแนะนำการลงทุน โปรดใช้ประกอบการตัดสินใจของคุณเอง
           </p>
         </div>

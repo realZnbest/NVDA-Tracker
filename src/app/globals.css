@@ -36,6 +36,54 @@
 
   --font-thai: var(--font-plex-thai);
   --font-mono: var(--font-plex-mono);
+
+  /* ---- Fluid layout scale ---- */
+  /* Instrument-wall pages (dashboard, financials) widen fluidly on large monitors so
+     content expands with the screen instead of pooling in the middle with big black bars
+     either side. Reading-oriented pages (news, alerts, portfolio) stay narrow. */
+  --container-page: min(92vw, 1400px);
+  --container-reading: min(92vw, 48rem);
+
+  /* Comfortable large-screen display type (the live quote price and page headlines). */
+  --display-price: clamp(2.25rem, 1.5rem + 1.6vw, 4rem);
+  --display-headline: clamp(1.125rem, 1rem + 0.5vw, 1.75rem);
+}
+
+/* Global proportional scaling: Tailwind v4 sizes spacing and text in rem, so raising the
+   root font-size above laptop widths scales EVERY element — text, gaps, padding, module
+   corners, inputs — by one uniform factor, keeping the exact proportions seen on a 13-16"
+   laptop instead of looking shrunken/sunken on a large monitor. Below 1536px the root stays
+   at 16px so existing laptop/phone rendering is untouched. */
+@media (min-width: 1536px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 18px;
+  }
+}
+
+@media (min-width: 2500px) {
+  html {
+    font-size: 19px;
+  }
+}
+
+/* Instrument-wall container widens in the same steps, capped by viewport so it never
+   overflows (no horizontal scrollbar) and grows with the root rem scale proportionally. */
+@media (min-width: 1536px) {
+  :root {
+    --container-page: min(92vw, 1800px);
+  }
+}
+
+@media (min-width: 2500px) {
+  :root {
+    --container-page: min(88vw, 2200px);
+  }
 }
 
 @theme inline {
@@ -71,6 +119,26 @@
 
   --font-thai: var(--font-plex-thai);
   --font-mono: var(--font-plex-mono);
+}
+
+@utility page-container {
+  margin-inline: auto;
+  width: min(100%, var(--container-page));
+  padding: 1rem;
+}
+
+@utility page-container-reading {
+  margin-inline: auto;
+  width: min(100%, var(--container-reading));
+  padding: 1rem;
+}
+
+@utility text-display-price {
+  font-size: var(--display-price);
+}
+
+@utility text-display-headline {
+  font-size: var(--display-headline);
 }
 
 * {
@@ -139,7 +207,7 @@ body {
 
   .module-label {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 0.625rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-muted);

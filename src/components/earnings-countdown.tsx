@@ -78,7 +78,7 @@ export function EarningsCountdown({ symbol }: { symbol: string }) {
             {event.hour && HOUR_LABEL_TH[event.hour] && ` · ${HOUR_LABEL_TH[event.hour]}`}
           </span>
           {event.epsEstimate !== null && (
-            <span className="telemetry text-[10px] text-text-muted mt-1">
+            <span className="telemetry text-[0.625rem] text-text-muted mt-1">
               คาด EPS {event.epsEstimate.toFixed(2)}
             </span>
           )}

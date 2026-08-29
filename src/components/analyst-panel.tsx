@@ -85,7 +85,7 @@ function RatingBreakdown({ trend }: { trend: FinnhubRecommendationTrend }) {
         >
           {consensus.label}
         </span>
-        <span className="telemetry text-[10px] text-text-muted">จาก {total} นักวิเคราะห์</span>
+        <span className="telemetry text-[0.625rem] text-text-muted">จาก {total} นักวิเคราะห์</span>
       </div>
 
       {total > 0 && (
@@ -99,7 +99,7 @@ function RatingBreakdown({ trend }: { trend: FinnhubRecommendationTrend }) {
       )}
       <div className="flex flex-wrap gap-x-3 gap-y-1">
         {segments.map((s) => (
-          <span key={s.key} className="flex items-center gap-1 telemetry text-[10px] text-text-secondary">
+          <span key={s.key} className="flex items-center gap-1 telemetry text-[0.625rem] text-text-secondary">
             <span className="h-1.5 w-1.5 rounded-sm" style={{ background: s.color }} />
             {s.label} {s.count}
           </span>
