@@ -665,7 +665,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
 
       <div
         className="relative"
-        style={{ height: `calc(clamp(200px, 7.5vw, 420px) + ${panesVisible} * clamp(118px, 4vw, 176px))` }}
+        style={{ height: `calc(clamp(200px, 11vw, 480px) + ${panesVisible} * clamp(130px, 7vw, 190px))` }}
       >
         <div ref={containerRef} className="absolute inset-0" />
         {status === "loading" && <ChartOverlay text="กำลังโหลดข้อมูลราคา…" />}

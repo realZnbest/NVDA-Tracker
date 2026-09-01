@@ -29,7 +29,7 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
   return (
     <div className="page-container flex flex-col gap-4">
       <QuoteHeader symbol={symbol} />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_clamp(320px,22vw,460px)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_clamp(360px,24vw,460px)]">
         <PriceChart symbol={symbol} timeframe={timeframe} onTimeframeChange={setTimeframe} />
         <div className="flex flex-col gap-4">
           <AnalysisPanel symbol={symbol} timeframe={timeframe} />

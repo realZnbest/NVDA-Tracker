@@ -38,13 +38,17 @@
   --font-mono: var(--font-plex-mono);
 
   /* ---- Fluid layout scale ---- */
-  /* Instrument-wall pages (dashboard, financials) widen fluidly on large monitors so
+  /* Instrument-wall pages (dashboard, financials) widen fluidly on LARGE monitors so
      content expands with the screen instead of pooling in the middle with big black bars
-     either side. Reading-oriented pages (news, alerts, portfolio) stay narrow. */
-  --container-page: min(92vw, 1400px);
-  --container-reading: min(92vw, 48rem);
+     either side. Reading-oriented pages (news, alerts, portfolio) stay narrow. Below the
+     2xl breakpoint the container is exactly the original max-width (1400px / 48rem) with
+     plain 1rem padding, so phones and laptops render pixel-identical to before. */
+  --container-page: 1400px;
+  --container-reading: 48rem;
 
-  /* Comfortable large-screen display type (the live quote price and page headlines). */
+  /* Comfortable large-screen display type (the live quote price and page headlines).
+     At phone/laptop widths the clamp resolves to the original sizes (2.25rem = text-4xl,
+     1.125rem = text-lg), so nothing below the 2xl breakpoint changes. */
   --display-price: clamp(2.25rem, 1.5rem + 1.6vw, 4rem);
   --display-headline: clamp(1.125rem, 1rem + 0.5vw, 1.75rem);
 }
@@ -52,8 +56,8 @@
 /* Global proportional scaling: Tailwind v4 sizes spacing and text in rem, so raising the
    root font-size above laptop widths scales EVERY element — text, gaps, padding, module
    corners, inputs — by one uniform factor, keeping the exact proportions seen on a 13-16"
-   laptop instead of looking shrunken/sunken on a large monitor. Below 1536px the root stays
-   at 16px so existing laptop/phone rendering is untouched. */
+   laptop instead of looking shrunken/sunken on a large monitor. Below 1536px the root
+   stays at 16px so existing phone and laptop rendering is untouched. */
 @media (min-width: 1536px) {
   html {
     font-size: 17px;
@@ -72,8 +76,8 @@
   }
 }
 
-/* Instrument-wall container widens in the same steps, capped by viewport so it never
-   overflows (no horizontal scrollbar) and grows with the root rem scale proportionally. */
+/* Instrument-wall container widens only on large monitors, capped by viewport so it never
+   overflows (no horizontal scrollbar). */
 @media (min-width: 1536px) {
   :root {
     --container-page: min(92vw, 1800px);

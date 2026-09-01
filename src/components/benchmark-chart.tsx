@@ -185,7 +185,7 @@ export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timefram
       )}
       {status === "error" && <p className="text-sm text-text-muted px-4 py-6">โหลดข้อมูลไม่สำเร็จ</p>}
 
-      <div ref={containerRef} className="w-full" style={{ height: "clamp(240px, 13vw, 420px)" }} />
+      <div ref={containerRef} className="w-full" style={{ height: "clamp(240px, 14vw, 460px)" }} />
 
       {status === "ready" && nvdaChange !== null && sp500Change !== null && nasdaqChange !== null && (
         <ComparisonSummary symbol={symbol} nvda={nvdaChange} sp500={sp500Change} nasdaq={nasdaqChange} />
