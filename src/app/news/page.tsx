@@ -1,5 +1,5 @@
-import { NewsPageView } from "@/components/news-page-view";
+import { redirect } from "next/navigation";
 
 export default function NewsPage() {
-  return <NewsPageView symbol="NVDA" />;
+  redirect("/");
 }

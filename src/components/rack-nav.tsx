@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   { href: "/alerts", label: "การแจ้งเตือน", icon: IconBell, symbolAware: false },
 ] as const;
 
-const LAST_SYMBOL_KEY = "nvda-tracker.last-symbol";
+const LAST_SYMBOL_KEY = "stock-tracker.last-symbol";
 
 export function RackNav() {
   const pathname = usePathname();
