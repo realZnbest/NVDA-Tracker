@@ -153,7 +153,6 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
   // authenticated owner session, even though this chart itself renders on the public dashboard.
   useEffect(() => {
     if (authStatus !== "authenticated") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear private data on logout
       setAvgCost(null);
       return;
     }
@@ -205,7 +204,6 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
     [timeframe, symbol]
   );
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- the load flips status to "loading" up front so the timeframe switch shows an overlay immediately
   useEffect(() => loadCandles("initial"), [loadCandles]);
 
   const refresh = useCallback(() => {

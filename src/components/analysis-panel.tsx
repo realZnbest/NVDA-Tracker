@@ -21,7 +21,6 @@ export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string;
 
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the timeframe changes
     setStatus("loading");
     fetch(`/api/analysis?tf=${timeframe}&symbol=${symbol}`)
       .then((r) => r.json())
@@ -44,7 +43,6 @@ export function AnalysisPanel({ symbol = "NVDA", timeframe }: { symbol?: string;
   // simply doesn't render, same graceful-absence pattern as an unauthenticated visitor.
   useEffect(() => {
     if (authStatus !== "authenticated") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear private data on logout
       setPositionLine(null);
       return;
     }

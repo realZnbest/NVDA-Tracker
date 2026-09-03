@@ -158,7 +158,6 @@ export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timefram
     [timeframe, symbol]
   );
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- the load flips status to "loading" up front so a timeframe switch shows it immediately
   useEffect(() => load("initial"), [load]);
 
   const refresh = useCallback(() => {

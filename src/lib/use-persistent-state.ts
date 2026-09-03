@@ -23,7 +23,6 @@ export function usePersistentState<T>(
     try {
       const raw = window.localStorage.getItem(key);
       if (raw !== null) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage doesn't exist during SSR, so restoring can only happen after mount
         setValue(JSON.parse(raw) as T);
       }
     } catch {

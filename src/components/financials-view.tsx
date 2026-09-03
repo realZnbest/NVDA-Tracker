@@ -22,7 +22,6 @@ export function FinancialsView({ symbol = "NVDA" }: { symbol?: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the symbol changes
     setStatus("loading");
     fetch(`/api/financials?symbol=${symbol}`)
       .then((r) => r.json())

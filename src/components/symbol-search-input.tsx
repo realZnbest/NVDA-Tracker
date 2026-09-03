@@ -43,7 +43,6 @@ export function SymbolSearchInput({
 
   useEffect(() => {
     if (!open || value.trim().length < 1) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear stale results when the query is cleared or the dropdown closes
       setResults([]);
       return;
     }

@@ -4,11 +4,11 @@ import { requireAlertsAuth } from "@/lib/alerts-auth";
 
 export async function PATCH(
   request: NextRequest,
-  ctx: RouteContext<"/api/alerts/[id]">
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const unauth = await requireAlertsAuth();
   if (unauth) return unauth;
-  const { id } = await ctx.params;
+  const { id } = await params;
   const body = (await request.json()) as Partial<{
     label: string;
     threshold: number | null;
@@ -23,11 +23,11 @@ export async function PATCH(
 
 export async function DELETE(
   _request: NextRequest,
-  ctx: RouteContext<"/api/alerts/[id]">
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const unauth = await requireAlertsAuth();
   if (unauth) return unauth;
-  const { id } = await ctx.params;
+  const { id } = await params;
   await deleteAlert(id);
   return NextResponse.json({ ok: true });
 }

@@ -33,7 +33,6 @@ export function RackNav() {
 
   useEffect(() => {
     if (urlSymbol) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror the URL's symbol into cross-page state
       setLastSymbol(urlSymbol);
       localStorage.setItem(LAST_SYMBOL_KEY, urlSymbol);
     } else if (lastSymbol === undefined) {

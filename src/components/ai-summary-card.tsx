@@ -17,7 +17,6 @@ export function AiSummaryCard({
 
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset status when the symbol changes
     setStatus("loading");
     fetch(`/api/ai-summary?type=${type}&symbol=${symbol}`)
       .then((r) => r.json())

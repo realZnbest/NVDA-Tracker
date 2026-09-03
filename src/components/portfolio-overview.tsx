@@ -27,7 +27,6 @@ export function PortfolioOverview() {
   useEffect(() => {
     if (authStatus !== "authenticated") return;
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- show the loading state immediately on mount/auth
     setLoading(true);
     fetch("/api/position")
       .then((r) => r.json())

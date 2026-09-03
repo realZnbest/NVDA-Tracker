@@ -54,13 +54,11 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
       .finally(() => setLoading(false));
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- default the date field to today on mount
     setPurchaseDate(toDisplayDate(Date.now()));
   }, []);
 
   useEffect(() => {
     if (authStatus !== "authenticated") return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- show the loading state immediately when switching symbols
     setLoading(true);
     refresh();
     fetch(`/api/quote?symbol=${symbol}`)
