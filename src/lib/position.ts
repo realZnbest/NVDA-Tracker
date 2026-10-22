@@ -61,7 +61,10 @@ export function computeAggregatePositionsBySymbol(
  * defaults — both surfaces must at least agree on what "default" means.
  */
 export function defaultTargets(price: number): number[] {
-  return [Math.round(price * 1.1), Math.round(price * 1.25), Math.round(price * 1.5)];
+  // Round to cents and dedupe: whole-dollar rounding collapses cheap stocks' targets
+  // into duplicate prices (e.g. $1.40 → 2, 2, 2) and React keys collide.
+  const targets = [1.1, 1.25, 1.5].map((m) => Math.round(price * m * 100) / 100);
+  return Array.from(new Set(targets));
 }
 
 export function computePositionMetrics(

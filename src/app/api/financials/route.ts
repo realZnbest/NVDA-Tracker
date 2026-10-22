@@ -36,7 +36,12 @@ function earningsToReported(
   events: FinnhubEarningsEvent[],
   knownData: FinnhubReportedFinancials
 ): FinnhubReportedFinancials {
-  const knownEnds = new Set(knownData.data.map((e) => e.endDate));
+  // The same "YYYY-MM-DD" normalization as mergeFinancials, otherwise the guard below
+  // can never match Finnhub's "YYYY-MM-DD 00:00:00" endDates and duplicates slip through.
+  const norm = (d: string) => String(d).slice(0, 10);
+  const knownEnds = new Set(knownData.data.map((e) => norm(e.endDate)));
+
+  if (knownData.data.length === 0) return { data: [] };
 
   // The latest reported quarter end is our anchor — the missing quarter is ~3 months
   // later. Falls back to a ~1 month shift off the earnings date if no anchor exists.
@@ -134,7 +139,9 @@ export async function GET(request: NextRequest) {
           }
         }
       }
-    } else if (!reported) {
+    } else {
+      // Either Finnhub returned no rows or returned an empty data array — both mean
+      // nothing to show from the primary source, so try EDGAR.
       const edgarData = await getReportedFinancialsFromEdgar(symbol);
       if (edgarData?.data?.length) {
         assignFiscalQuarters({ data: [] }, edgarData);

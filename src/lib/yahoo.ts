@@ -2,6 +2,9 @@ import type { FinnhubCandles } from "./finnhub";
 
 interface YahooMeta {
   regularMarketPrice: number;
+  shortName?: string;
+  longName?: string;
+  exchangeName?: string;
   previousClose?: number;
   chartPreviousClose?: number;
   preMarketPrice?: number;
@@ -42,6 +45,11 @@ export interface ExtendedHoursQuote {
   session: MarketSession;
   pre: { price: number; change: number; changePercent: number } | null;
   post: { price: number; change: number; changePercent: number } | null;
+  /** Yahoo's exchange label (e.g. "NasdaqGS", "NYSE") — shown in the quote header
+   *  instead of hardcoding every symbol as NASDAQ. */
+  exchangeName: string | null;
+  /** Company name from Yahoo metadata, so non-NVDA symbols don't fall back to a ticker. */
+  companyName: string | null;
   /** Last official regular-session trade price — frozen outside regular hours (unlike
    *  the quote route's `c`, which keeps tracking pre/post trade prints all day). This is
    *  what the header shows as "the" price outside regular hours, with pre/post surfaced
@@ -54,6 +62,9 @@ const cache = new Map<string, CacheEntry>();
 
 type ExtCacheEntry = { expires: number; data: ExtendedHoursQuote };
 const extendedCache = new Map<string, ExtCacheEntry>();
+
+type NameCacheEntry = { expires: number; data: string | null };
+const nameCache = new Map<string, NameCacheEntry>();
 
 function computeSession(period: YahooMeta["currentTradingPeriod"]): MarketSession {
   if (!period) return "closed";
@@ -83,7 +94,7 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
   const hit = extendedCache.get(symbol);
   if (hit && hit.expires > Date.now()) return hit.data;
 
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1m&includePrePost=true`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m&includePrePost=true`;
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0" },
     cache: "no-store",
@@ -143,7 +154,14 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
     }
   }
 
-  const result: ExtendedHoursQuote = { session, pre, post, regularMarketPrice: regularPrice };
+  const result: ExtendedHoursQuote = {
+    session,
+    pre,
+    post,
+    exchangeName: meta.exchangeName ?? null,
+    companyName: meta.longName ?? meta.shortName ?? null,
+    regularMarketPrice: regularPrice,
+  };
 
   // Matched to getQuote's TTL — both feed the same header row, and the extended-hours
   // delta is measured against the regular price, so letting one go stale while the other
@@ -161,6 +179,32 @@ function candleCacheTtl(interval: string): number {
   return interval.endsWith("m") ? 30_000 : 5 * 60_000;
 }
 
+/**
+ * Company name used to judge whether a news article is really about `symbol`.
+ * Cached for a day: names change rarely, and news routes call this on every load.
+ */
+export async function getYahooCompanyName(symbol: string): Promise<string | null> {
+  const hit = nameCache.get(symbol);
+  if (hit && hit.expires > Date.now()) return hit.data;
+
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as YahooChartResponse;
+    const meta = data.chart.result?.[0]?.meta;
+    const name = meta?.longName ?? meta?.shortName ?? null;
+    nameCache.set(symbol, { expires: Date.now() + 24 * 60 * 60_000, data: name });
+    return name;
+  } catch {
+    // Best-effort: callers fall back to ticker-only matching / the raw feed.
+    return null;
+  }
+}
+
 export async function getYahooCandles(
   symbol: string,
   range: string,
@@ -170,7 +214,7 @@ export async function getYahooCandles(
   const hit = cache.get(cacheKey);
   if (hit && hit.expires > Date.now()) return hit.data;
 
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=${interval}`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0" },
     cache: "no-store",
@@ -184,7 +228,12 @@ export async function getYahooCandles(
     throw new Error("YAHOO_NO_DATA");
   }
 
-  const quote = result.indicators.quote[0];
+  const quote = result.indicators.quote?.[0];
+  const timestamps = result.timestamp;
+  if (!quote || !Array.isArray(timestamps)) {
+    throw new Error("YAHOO_NO_DATA");
+  }
+
   const t: number[] = [];
   const o: number[] = [];
   const h: number[] = [];
@@ -192,14 +241,14 @@ export async function getYahooCandles(
   const c: number[] = [];
   const v: number[] = [];
 
-  for (let i = 0; i < result.timestamp.length; i++) {
+  for (let i = 0; i < timestamps.length; i++) {
     const open = quote.open[i];
     const high = quote.high[i];
     const low = quote.low[i];
     const close = quote.close[i];
     const volume = quote.volume[i];
-    if (open === null || high === null || low === null || close === null) continue;
-    t.push(result.timestamp[i]);
+    if (open == null || high == null || low == null || close == null) continue;
+    t.push(timestamps[i]);
     o.push(open);
     h.push(high);
     l.push(low);

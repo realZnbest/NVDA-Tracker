@@ -8,6 +8,7 @@ import {
 import { extractAllQuarters } from "@/lib/financial-metrics";
 import { generateSummary, AiError, TONE_INSTRUCTION } from "@/lib/ai-provider";
 import { filterRelevantNews } from "@/lib/news-filter";
+import { getYahooCompanyName } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 
 type SummaryType = "news" | "financials";
@@ -71,8 +72,11 @@ ${TONE_INSTRUCTION} ใช้เฉพาะตัวเลขที่ให้
 async function buildNewsPrompt(symbol: string): Promise<string> {
   const to = new Date();
   const from = new Date(to.getTime() - 21 * 24 * 60 * 60 * 1000);
-  const news = await getCompanyNews(symbol, isoDate(from), isoDate(to));
-  const items = filterRelevantNews(news)
+  const [news, companyName] = await Promise.all([
+    getCompanyNews(symbol, isoDate(from), isoDate(to)),
+    getYahooCompanyName(symbol),
+  ]);
+  const items = filterRelevantNews(news, symbol, companyName)
     .sort((a, b) => b.datetime - a.datetime)
     .slice(0, 10);
 

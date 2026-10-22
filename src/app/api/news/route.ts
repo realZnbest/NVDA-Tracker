@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCompanyNews, FinnhubError } from "@/lib/finnhub";
+import { getYahooCompanyName } from "@/lib/yahoo";
 import { filterRelevantNews } from "@/lib/news-filter";
 import { SYMBOL } from "@/lib/timeframes";
 
@@ -8,13 +9,16 @@ function isoDate(d: Date) {
 }
 
 export async function GET(request: NextRequest) {
-  const symbol = request.nextUrl.searchParams.get("symbol") ?? SYMBOL;
+  const symbol = (request.nextUrl.searchParams.get("symbol") ?? SYMBOL).toUpperCase();
   const to = new Date();
   const from = new Date(to.getTime() - 21 * 24 * 60 * 60 * 1000);
 
   try {
-    const news = await getCompanyNews(symbol, isoDate(from), isoDate(to));
-    const cleaned = filterRelevantNews(news)
+    const [news, companyName] = await Promise.all([
+      getCompanyNews(symbol, isoDate(from), isoDate(to)),
+      getYahooCompanyName(symbol),
+    ]);
+    const cleaned = filterRelevantNews(news, symbol, companyName)
       .sort((a, b) => b.datetime - a.datetime)
       .slice(0, 40);
     return NextResponse.json({ news: cleaned });

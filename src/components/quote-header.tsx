@@ -28,6 +28,18 @@ const SESSION_GLOW: Record<ExtendedHoursQuote["session"], string> = {
   closed: "transparent",
 };
 
+// Yahoo reports exchange codes (NMS, NYQ, PCX, ...) rather than marketing names.
+function exchangeLabel(name: string): string {
+  const code = name.toUpperCase();
+  if (["NMS", "NGM", "NCM"].includes(code) || /nasdaq/i.test(name)) return "NASDAQ";
+  if (["NYQ", "NYS"].includes(code) || /nyse|new york/i.test(name)) return "NYSE";
+  if (["PCX", "ARCA"].includes(code) || /arca/i.test(name)) return "NYSE ARCA";
+  if (["ASE", "AMEX"].includes(code) || /amex|american/i.test(name)) return "AMEX";
+  if (["BTS", "CBOE"].includes(code) || /bats|cboe/i.test(name)) return "CBOE";
+  if (["PNK", "OQB", "OQX"].includes(code)) return "OTC";
+  return name;
+}
+
 export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
   const router = useRouter();
   const [quote, setQuote] = useState<FinnhubQuote | null>(null);
@@ -72,6 +84,8 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
 
   const up = mainChange !== undefined ? mainChange >= 0 : true;
   const priceColor = up ? "var(--up)" : "var(--down)";
+  const companyName = extended?.companyName?.toUpperCase();
+  const exchange = extended?.exchangeName ? exchangeLabel(extended.exchangeName) : null;
 
   return (
     <div
@@ -86,10 +100,11 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
       <div className="w-full sm:w-auto">
         <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 mb-2">
           <h1 className="text-display-headline font-semibold tracking-tight text-text-primary whitespace-nowrap">
-            {symbol === "NVDA" ? "NVIDIA CORPORATION" : symbol}
+            {companyName ?? (symbol === "NVDA" ? "NVIDIA CORPORATION" : symbol)}
           </h1>
           <span className="telemetry rounded px-2 py-0.5 text-[0.6875rem] bg-ch-price-dim text-ch-price whitespace-nowrap">
-            NASDAQ · {symbol}
+            {exchange ? `${exchange} · ` : ""}
+            {symbol}
           </span>
           <div className="ml-auto flex flex-col items-end gap-1 sm:hidden">
             <NotificationBell />

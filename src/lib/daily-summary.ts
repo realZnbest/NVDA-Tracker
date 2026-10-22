@@ -8,14 +8,13 @@ import {
   type FinnhubEarningsEvent,
   type FinnhubQuote,
 } from "./finnhub";
-import { getYahooCandles } from "./yahoo";
+import { getYahooCandles, getYahooCompanyName } from "./yahoo";
 import { extractAllQuarters, type QuarterMetrics } from "./financial-metrics";
 import { filterRelevantNews } from "./news-filter";
 import {
   bollinger,
   computeSupportResistance,
   detectStructureBreaks,
-  ema,
   findPivots,
   lastValid,
   macd,
@@ -187,8 +186,8 @@ async function collectSymbol(
     macdSignal: lastValid(macdSeries.signal),
     macdHistogram: lastValid(macdSeries.histogram),
     ma20: lastValid(sma(closes, 20)),
-    ma50: lastValid(ema(closes, 50)),
-    ma200: lastValid(ema(closes, 200)),
+    ma50: lastValid(sma(closes, 50)),
+    ma200: lastValid(sma(closes, 200)),
     bollingerUpper: lastValid(bb.upper),
     bollingerLower: lastValid(bb.lower),
   };
@@ -214,7 +213,7 @@ async function collectSymbol(
       : null;
 
   const to = new Date();
-  const [basic, reported, trends, earningsCal, news] = await Promise.all([
+  const [basic, reported, trends, earningsCal, news, companyName] = await Promise.all([
     getBasicFinancials(symbol).catch(() => null),
     getReportedFinancials(symbol, "quarterly").catch(() => null),
     getRecommendationTrends(symbol).catch(() => null),
@@ -228,6 +227,7 @@ async function collectSymbol(
       isoDate(new Date(to.getTime() - 14 * 24 * 60 * 60 * 1000)),
       isoDate(to)
     ).catch(() => null),
+    getYahooCompanyName(symbol).catch(() => null),
   ]);
 
   const m = basic?.metric ?? {};
@@ -284,7 +284,7 @@ async function collectSymbol(
   }
 
   const headlines = news
-    ? filterRelevantNews(news)
+    ? filterRelevantNews(news, symbol, companyName)
         .sort((a, b) => b.datetime - a.datetime)
         .slice(0, 5)
         .map((n) => ({ source: n.source, headline: n.headline }))

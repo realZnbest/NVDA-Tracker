@@ -41,6 +41,8 @@ export function PnlProjectionPanel({ symbol = "NVDA" }: { symbol?: string }) {
 
   // Target prices are saved to localStorage (client-side, not server state), so a page
   // refresh — or a server redeploy, which only ever affects the server — never loses them.
+  const [storedTargets, setStoredTargets] = useState<number[] | null>(null);
+
   useEffect(() => {
     setTargetsLoaded(false);
     try {
@@ -48,19 +50,26 @@ export function PnlProjectionPanel({ symbol = "NVDA" }: { symbol?: string }) {
       const parsed = raw ? JSON.parse(raw) : null;
       if (Array.isArray(parsed) && parsed.every((n) => typeof n === "number")) {
         setTargets(parsed);
+        setStoredTargets(parsed);
       } else {
         setTargets([]);
+        setStoredTargets(null);
       }
     } catch {
       setTargets([]);
+      setStoredTargets(null);
     }
     setTargetsLoaded(true);
   }, [symbol]);
 
   useEffect(() => {
     if (price === null || !targetsLoaded) return;
-    setTargets((prev) => (prev.length === 0 ? defaultTargets(price) : prev));
-  }, [price, targetsLoaded]);
+    setTargets((prev) =>
+      prev.length === 0 && storedTargets === null
+        ? defaultTargets(price)
+        : prev
+    );
+  }, [price, targetsLoaded, storedTargets]);
 
   useEffect(() => {
     if (!targetsLoaded) return;

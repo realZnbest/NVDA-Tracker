@@ -1,4 +1,4 @@
-import { ema, macd, rsi } from "./indicators";
+import { macd, rsi, sma } from "./indicators";
 import { addNotification, listAlerts, listPortfolioAlerts, markAlertTriggered } from "./alerts-store";
 import { computePositionMetrics, type AggregatePosition } from "./position";
 import { ALERT_TYPE_LABEL_TH } from "./types";
@@ -30,7 +30,9 @@ async function fire(alert: Alert, scopeLabel: string, message: string): Promise<
   await markAlertTriggered(alert.id);
   const fullMessage = `[${scopeLabel} · ${ALERT_TYPE_LABEL_TH[alert.type]}] ${message}`;
   const notification = await addNotification(alert.id, fullMessage);
-  void sendAlertEmail(alert.label, fullMessage);
+  // Await the mailer: on serverless, work left running after the response can be
+  // frozen and dropped, and failures here are already swallowed inside sendAlertEmail.
+  await sendAlertEmail(alert.label, fullMessage);
   return notification;
 }
 
@@ -42,8 +44,8 @@ async function evaluateSymbolAlerts(snapshot: SymbolMarketSnapshot): Promise<Ale
   const pnlPercent = position ? computePositionMetrics(position, price).unrealizedPnlPercent : null;
   const rsiSeries = rsi(closes, 14);
   const macdSeries = macd(closes);
-  const ma50 = ema(closes, 50);
-  const ma200 = ema(closes, 200);
+  const ma50 = sma(closes, 50);
+  const ma200 = sma(closes, 200);
 
   const lastRsi = rsiSeries[rsiSeries.length - 1];
   const macdLast = macdSeries.macd[macdSeries.macd.length - 1];

@@ -7,6 +7,7 @@ import {
 import { extractAllQuarters } from "@/lib/financial-metrics";
 import { generateChatReply, type ChatMessage } from "@/lib/ai-provider";
 import { filterRelevantNews } from "@/lib/news-filter";
+import { getYahooCompanyName } from "@/lib/yahoo";
 import { SYMBOL } from "@/lib/timeframes";
 import { getAnalysisRead } from "@/lib/analysis";
 
@@ -20,13 +21,32 @@ const MAX_MESSAGE_LENGTH = 500;
 const MAX_HISTORY = 10;
 
 const requestLog = new Map<string, number[]>();
+let lastSweep = 0;
+
+/** Drops empty/expired IP entries once per window, so the map can't grow forever. */
+function sweepRequestLog(now: number) {
+  if (now - lastSweep < RATE_LIMIT_WINDOW_MS) return;
+  lastSweep = now;
+  for (const [ip, times] of requestLog) {
+    const recent = times.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (recent.length > 0) requestLog.set(ip, recent);
+    else requestLog.delete(ip);
+  }
+}
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
+  sweepRequestLog(now);
   const recent = (requestLog.get(ip) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  // Rejected requests must not extend the window, otherwise a user hammering the
+  // button stays blocked forever instead of clearing after 10 minutes.
+  if (recent.length >= RATE_LIMIT_MAX) {
+    requestLog.set(ip, recent);
+    return true;
+  }
   recent.push(now);
   requestLog.set(ip, recent);
-  return recent.length > RATE_LIMIT_MAX;
+  return false;
 }
 
 function isoDate(d: Date) {
@@ -55,8 +75,11 @@ async function buildChatContext(symbol: string): Promise<string> {
   try {
     const to = new Date();
     const from = new Date(to.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const news = await getCompanyNews(symbol, isoDate(from), isoDate(to));
-    const items = filterRelevantNews(news)
+    const [news, companyName] = await Promise.all([
+      getCompanyNews(symbol, isoDate(from), isoDate(to)),
+      getYahooCompanyName(symbol),
+    ]);
+    const items = filterRelevantNews(news, symbol, companyName)
       .sort((a, b) => b.datetime - a.datetime)
       .slice(0, 5);
     if (items.length > 0) {
@@ -113,15 +136,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
-  const body = (await request.json()) as { messages?: ChatMessage[]; symbol?: string };
-  const symbol = body.symbol || SYMBOL;
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  if (messages.length === 0) {
+  let body: { messages?: unknown; symbol?: unknown };
+  try {
+    body = (await request.json()) as { messages?: unknown; symbol?: unknown };
+  } catch {
+    return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
+  }
+
+  const requestedSymbol = typeof body.symbol === "string" ? body.symbol.trim().toUpperCase() : "";
+  const symbol = /^[A-Z0-9.^-]{1,12}$/.test(requestedSymbol) ? requestedSymbol : SYMBOL;
+
+  const messages = Array.isArray(body.messages) ? (body.messages as ChatMessage[]) : [];
+  const validHistory =
+    messages.length > 0 &&
+    messages.length <= 50 &&
+    messages.every(
+      (m) =>
+        m &&
+        (m.role === "user" || m.role === "assistant") &&
+        typeof m.content === "string" &&
+        m.content.length > 0 &&
+        m.content.length <= 8000
+    );
+  if (!validHistory) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
   const last = messages[messages.length - 1];
-  if (!last || last.role !== "user" || !last.content || last.content.length > MAX_MESSAGE_LENGTH) {
+  if (!last || last.role !== "user" || last.content.length > MAX_MESSAGE_LENGTH) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 

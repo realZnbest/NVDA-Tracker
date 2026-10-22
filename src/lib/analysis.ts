@@ -1,7 +1,7 @@
 import { getBasicFinancials, getQuote } from "./finnhub";
 import { getYahooCandles } from "./yahoo";
 import { SYMBOL, TIMEFRAMES, type TimeframeKey } from "./timeframes";
-import { bollinger, ema, lastValid, macd, rsi, sma } from "./indicators";
+import { bollinger, lastValid, macd, rsi, sma } from "./indicators";
 
 export class AnalysisDataError extends Error {}
 
@@ -260,8 +260,8 @@ export async function getAnalysisRead(
 
   const dailyCloses = dailyCandles.c;
   const ma20 = sma(dailyCloses, 20);
-  const ma50 = ema(dailyCloses, 50);
-  const ma200 = ema(dailyCloses, 200);
+  const ma50 = sma(dailyCloses, 50);
+  const ma200 = sma(dailyCloses, 200);
   const bb = bollinger(dailyCloses, 20);
   const m = financials.metric;
 
