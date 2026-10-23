@@ -125,6 +125,26 @@ export function IconStar({ className }: IconProps) {
   );
 }
 
+export function IconSliders({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 7h5M13 7h7M4 12h9M17 12h3M4 17h3M11 17h9" />
+      <circle cx="11" cy="7" r="2" />
+      <circle cx="15" cy="12" r="2" />
+      <circle cx="9" cy="17" r="2" />
+    </svg>
+  );
+}
+
+export function IconCalendar({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="4" y="5" width="16" height="15" rx="1" />
+      <path d="M4 9h16M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
 export function IconChevronDown({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...base}>

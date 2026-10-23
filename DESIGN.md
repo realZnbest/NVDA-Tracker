@@ -27,7 +27,7 @@ colors:
 typography:
   display:
     fontFamily: "IBM Plex Mono, ui-monospace, monospace"
-    fontSize: "2.25rem"
+    fontSize: "2rem"
     fontWeight: 500
     lineHeight: 1.1
     letterSpacing: "0.01em"
@@ -121,7 +121,7 @@ Ground colors sit within a few steps of near-black; every hue that appears above
 **Character:** IBM Plex Sans Thai carries every sentence of UI copy in natural Thai financial language, calm and legible at small sizes; IBM Plex Mono carries every number that represents a live measurement, giving the instrument-panel its "readout" feel. The two are never mixed within a single text run — a Thai label sits beside a mono value, they don't share a line.
 
 ### Hierarchy
-- **Display** (500, 2.25rem / `text-4xl`, 1.1 line-height, mono): the live NVDA quote price. The single largest text on the page, reserved for that one value.
+- **Display** (500, 2rem / `text-[2rem]`, 1.1 line-height, mono; 1.75rem on phones): the live quote price in the compact cockpit header. The largest text on the dashboard, reserved for that one value.
 - **Headline** (500, 1.125rem / `text-lg`, mono is not used here — Thai sans): page titles ("งบการเงิน NVIDIA", "ข่าว NVIDIA").
 - **Title** (500, 0.875rem / `text-sm`): module content headers, nav labels, news headlines.
 - **Body** (400, 0.75–0.875rem / `text-xs`–`text-sm`, 1.6 line-height): analysis prose, news summaries, table cells.
@@ -132,11 +132,11 @@ Ground colors sit within a few steps of near-black; every hue that appears above
 
 ## Layout
 
-The page is a stack of rack modules inside a `max-w-[1400px]` centered container with `p-4` outer padding and `gap-4` between modules — the same rhythm used for outer page padding, module internal padding, and the gap between sibling modules, so the grid reads as one consistent unit of space rather than several competing scales.
+The dashboard is a full-bleed cockpit: no `max-width` cap and only an 8px outer gutter (`px-2 py-2`), matching the nav's own `px-2` so the instrument wall reads edge-to-edge instead of sitting in a centered column. At `xl` the page locks to the viewport (`xl:h-full` plus a `flex-1` grid) and does not scroll; the watchlist rail, chart, and inspector each manage their own overflow. The cockpit grid is a `180px` watchlist rail / fluid chart / `290px` inspector with a 12px gap — the chart is deliberately the largest surface by a wide margin. At `lg` it becomes two columns (`180px` rail + fluid chart) with the inspector spanning both columns beneath; below `lg` everything stacks and the page scrolls normally. Below `xl` the chart keeps a `clamp(480px, calc(100dvh - 13rem), 880px)` height so it still dominates on tablets and phones.
 
-Dashboard uses a `[1fr_360px]` two-column split above the `xl` breakpoint (price module + analysis module side by side), collapsing to a single stacked column below it. Financials uses a `2 / 4` responsive grid of ratio cards and trend-bar modules that collapses to 2 then 1 columns. News and Alerts constrain to `max-w-3xl` — narrower, reading-oriented columns instead of the dashboard's instrument-wall width.
+Financials uses a `2 / 4` responsive grid of ratio cards and trend-bar modules that collapses to 2 then 1 columns. News and Alerts constrain to `max-w-3xl` — narrower, reading-oriented columns instead of the dashboard's instrument-wall width.
 
-The top chrome is two stacked bars: a thin **annunciator strip** (channel lamps + notification bell, `py-1.5`) sits above the **module-tab nav** (`py-3` targets, underline-on-active). Both are sticky (`sticky top-0`) over a blurred raised-deck background so the instrument wall's "control desk" stays present while a long page scrolls beneath it. On narrow viewports the nav scrolls horizontally (`overflow-x-auto`) rather than wrapping tab labels onto a second line, which would break Thai compound words mid-word.
+The top chrome is one sticky module-tab nav (`px-2`, `py-3` targets, 2px `ch-price` underline on the active tab) over a blurred raised-deck background. Symbol search and the notification bell sit at the right. On narrow viewports the nav scrolls horizontally (`overflow-x-auto`) rather than wrapping tab labels onto a second line, which would break Thai compound words mid-word.
 
 ## Elevation & Depth
 
@@ -157,7 +157,7 @@ Corners are barely rounded (`3px`, `rounded-sm`) — enough to soften a rack pan
 ### Buttons
 - **Shape:** `rounded` (3px), matching module corners.
 - **Primary** (e.g. "เพิ่มการแจ้งเตือน"): `ch-price-dim` background, `ch-price` text, `px-3 py-1.5`.
-- **Toggle chip** (chart indicator toggles, timeframe pills): transparent by default; active state gets `bg-ch-price-dim` + `text-ch-price` (timeframe) or full opacity + a colored square swatch (indicator toggles). Inactive toggles drop to 40% opacity rather than disappearing, so the full instrument set stays visible even when off.
+- **Toggle chip** (timeframe pills): transparent by default; the active timeframe gets `bg-ch-price-dim` + `text-ch-price`. Chart indicator toggles live in the `ตัวชี้วัด` popover as channel rows with a small switch and parameter fields, not as a strip of chips on the chart; the popover trigger reports the active channel count.
 - **Ghost / destructive** (delete alert): icon-only, `text-text-muted` at rest, shifts to `text-ch-alert` on hover — the only place a neutral control turns alert-red on interaction.
 
 ### Chips / Lamps
@@ -178,14 +178,23 @@ Corners are barely rounded (`3px`, `rounded-sm`) — enough to soften a rack pan
 ### Navigation
 - **Style:** module-tab row, Thai labels at `text-sm` beside a 16px line icon; active tab gets a 2px `ch-price` underline and full-opacity `text-primary`; inactive tabs sit at `text-secondary` and lighten to `text-primary` on hover. Mobile: horizontal scroll, `whitespace-nowrap`, never wraps.
 
+### Instrument Header
+The full-width compact quote header (`px-4 py-2.5 sm:px-5`) carries the symbol/company, follow star, live price and change chip, day stats, and session wash. The data timestamp sits inline after the change chip at `xl` and drops beneath the price below `xl`, so the header stays one row on desktop without hiding freshness. It has no module title of its own; the symbol is the label.
+
+### Chart View Switch
+The chart module's header is a single row: a two-view segmented control (`กราฟราคา` / `เทียบตลาด`), a shared timeframe strip, and the active timeframe label. The compare view is mounted lazily on first open and kept alive afterwards; both views share the selected timeframe.
+
 ### Readout Strip
-A one-line telemetry bar directly beneath the chart toolbar, separated by a half-strength seam (`border-seam/60`). All mono, `text-[11px]`: a muted field label followed by its value in `text-primary`, except values that belong to a channel (VOL, RSI, MACD), which take that channel's exact color, and the change value, which takes `up`/`down`. Follows the crosshair; with the pointer off the chart it reads the latest bar and says so (`· ล่าสุด` in `ch-price`), because an instrument readout is never blank — it shows the live value until you probe elsewhere. Last-refresh time sits right-aligned in `text-muted`, the quiet proof the panel is still live.
+A one-line telemetry strip between the chart module's header and the canvas, separated by a half-strength seam (`border-seam/60`). All mono, `text-[11px]`: a muted field label followed by its value in `text-primary`, except values that belong to a channel (VOL, RSI, MACD), which take that channel's exact color, and the change value, which takes `up`/`down`. Follows the crosshair; with the pointer off the chart it reads the latest bar and says so (`· ล่าสุด` in `ch-price`), because an instrument readout is never blank — it shows the live value until you probe elsewhere. The right end holds the `ตัวชี้วัด` popover trigger. There is no last-refresh timestamp here — the quote header carries the data timestamp, so the readout stays a pure OHLC/indicator legend.
 
 ### Session Wash
 Market state read as ambient color rather than a discrete badge, so it survives at every viewport without adding a chip to an already-tight header row: a `radial-gradient` anchored at the quote header module's top-left corner (`ellipse 340px 230px at 0% 0%`), 10%-alpha `up` green while the regular session trades, 10%-alpha amber (`#e3a94b`) in pre/post, no gradient at all when the market is shut — same "unlit lamp has no glow" rule as the Annunciator lamp, just painted as a wash instead of a dot. Stays under the price/name text in paint order and at 10% alpha specifically so it never competes with foreground contrast; the Thai session name is still available via a native tooltip (`title`) rather than repeated as on-screen text.
 
+### Cockpit Rails
+The left rail (`180px`) lists the owner's watchlist with logo, symbol, price and change; signed-out visitors see the public market board (`SPY` / `QQQ` / `DIA` / `IWM`), and the owner gets a dashed `เพิ่มหุ้น` action row. The right inspector (`290px`) holds three tabs — `วิเคราะห์` / `นักวิเคราะห์` / `เหตุการณ์` — with all panels mounted and hidden so switching tabs never refetches. Both rails scroll independently; the inspector's scroll area reserves `pb-14` for the floating chat trigger.
+
 ### Price Instrument Panel (signature component)
-The centerpiece: a single `lightweight-charts` instance split into four native panes (price+overlays, volume, RSI, MACD) inside one module, so panning/zooming/crosshair stay synchronized across all four the way linked instrument channels would. Each pane's series use its channel's exact color; the candlestick pane's price scale is trimmed to a tight top/bottom margin (`0.08` / `0.02`) so candles fill their pane rather than floating in a mostly-empty scale, keeping the boundary between panes legible.
+The centerpiece: a single `lightweight-charts` instance split into four native panes (price+overlays, volume, RSI, MACD) inside one module, so panning/zooming/crosshair stay synchronized across all four the way linked instrument channels would. Each pane's series use its channel's exact color; the candlestick pane's price scale is trimmed to a tight top/bottom margin (`0.08` / `0.02`) so candles fill their pane rather than floating in a mostly-empty scale, keeping the boundary between panes legible. Pane stretch factors are `7 / 0.9 / 1.05 / 1.05`: the price pane takes roughly two-thirds of the chart height, with volume/RSI/MACD as compact subordinate strips, because the chart is the page's hero and the candles should get the vertical space. The default 1H window is width-aware: it opens on 20 days and widens toward 28 days on large cockpits, targeting ~9px bars, while range tabs keep their semantic window (1D is one day, 1M one month). Two bars of padding at each edge keep the first/last time labels from clipping, and support/resistance levels outside the visible price range are not drawn so their labels cannot pin to the time axis.
 
 ## Do's and Don'ts
 

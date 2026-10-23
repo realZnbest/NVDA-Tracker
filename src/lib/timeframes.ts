@@ -26,9 +26,9 @@ export const TIMEFRAMES: Timeframe[] = [
   // Yahoo hard limit: 60m/1h bars are only available for the last 730 days.
   // scopeDays counts calendar days, and weekends carry no bars — 5 calendar days can
   // collapse to as few as 3 trading sessions (~22 hourly bars), rendering as a handful
-  // of fat, sparse candles. 10 keeps a comfortable ~2 trading weeks of bars regardless
-  // of where the current day falls in the week.
-  { key: "1H", label: "1 ชั่วโมง", yahooRange: "2y", yahooInterval: "60m", scopeDays: 10 },
+  // of fat, sparse candles. 20 keeps roughly three trading weeks (~100 hourly bars), which
+  // fills the wide cockpit chart without the candles turning fat or the view losing focus.
+  { key: "1H", label: "1 ชั่วโมง", yahooRange: "2y", yahooInterval: "60m", scopeDays: 20 },
   // Yahoo hard limit: 5m bars are only available for roughly the last 60 days.
   { key: "1D", label: "1 วัน", yahooRange: "60d", yahooInterval: "5m", scopeDays: 1 },
   { key: "5D", label: "5 วัน", yahooRange: "60d", yahooInterval: "30m", scopeDays: 5 },
@@ -46,9 +46,10 @@ export const TIMEFRAMES: Timeframe[] = [
 export const SYMBOL = "NVDA";
 
 /**
- * Slices a candle set down to the window the selected tab is scoped to (e.g. "1D" means
- * the last day), not the full over-fetched history kept around for zoom-out headroom.
- * Mirrors the visible-range logic in price-chart.tsx's "scope the default view" effect.
+ * Slices a candle set down to the semantic window the selected tab is scoped to (e.g.
+ * "1D" means the last day), not the full over-fetched history kept for zoom-out
+ * headroom. The 1H price chart may widen its visible window on large screens, but
+ * analysis and comparison views stay on this fixed scope.
  */
 export function scopeCandles(candles: FinnhubCandles, key: TimeframeKey): FinnhubCandles {
   const times = candles.t;

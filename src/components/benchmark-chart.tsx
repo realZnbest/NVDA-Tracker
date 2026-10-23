@@ -45,7 +45,15 @@ function toPercentSeries(candles: FinnhubCandles) {
   }));
 }
 
-export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timeframe: TimeframeKey }) {
+export function BenchmarkChart({
+  symbol,
+  timeframe,
+  embedded = false,
+}: {
+  symbol: string;
+  timeframe: TimeframeKey;
+  embedded?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const nvdaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -74,7 +82,6 @@ export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timefram
       timeScale: { borderColor: CH.seam, timeVisible: true, secondsVisible: false },
       handleScroll: { vertTouchDrag: false },
       autoSize: true,
-      height: 240,
     });
     chartRef.current = chart;
     nvdaSeriesRef.current = chart.addSeries(LineSeries, {
@@ -165,30 +172,50 @@ export function BenchmarkChart({ symbol, timeframe }: { symbol: string; timefram
   }, [load]);
   usePoll(refresh, REFRESH_INTERVAL_MS, { leading: false });
 
-  return (
-    <div className="module flex flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-seam px-4 py-2.5">
+  const overlayText =
+    status === "loading"
+      ? "กำลังโหลดข้อมูลเทียบตลาด…"
+      : status === "no_key"
+        ? "ต้องตั้งค่า FINNHUB_API_KEY ก่อนจึงจะดูข้อมูลนี้ได้"
+        : status === "error"
+          ? "โหลดข้อมูลเทียบตลาดไม่สำเร็จ ลองรีเฟรชอีกครั้ง"
+          : null;
+
+  const content = (
+    <>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-seam/60 px-3 py-1.5">
         <span className="module-label">
           เทียบกับตลาดรวม <span className="telemetry text-ch-price">· {timeframe}</span>
         </span>
-        <div className="flex items-center gap-4 text-[0.6875rem]">
+        <div className="flex flex-wrap items-center gap-3 text-[10px]">
           <Legend label={symbol} color={CH.price} value={nvdaChange} />
           <Legend label="S&P 500" color={CH.benchmark} value={sp500Change} />
           <Legend label="NASDAQ 100" color={CH.nasdaq} value={nasdaqChange} />
         </div>
       </div>
 
-      {status === "loading" && <p className="text-sm text-text-muted px-4 py-6">กำลังโหลด…</p>}
-      {status === "no_key" && (
-        <p className="text-sm text-text-muted px-4 py-6">ต้องตั้งค่า FINNHUB_API_KEY ก่อนจึงจะดูข้อมูลนี้ได้</p>
-      )}
-      {status === "error" && <p className="text-sm text-text-muted px-4 py-6">โหลดข้อมูลไม่สำเร็จ</p>}
-
-      <div ref={containerRef} className="w-full" style={{ height: "clamp(240px, 14vw, 460px)" }} />
+      <div className="relative min-h-0 flex-1">
+        <div ref={containerRef} className="absolute inset-0" />
+        {overlayText && (
+          <div className="absolute inset-0 flex items-center justify-center bg-panel/70 px-6 text-center text-xs text-text-muted">
+            {overlayText}
+          </div>
+        )}
+      </div>
 
       {status === "ready" && nvdaChange !== null && sp500Change !== null && nasdaqChange !== null && (
         <ComparisonSummary symbol={symbol} nvda={nvdaChange} sp500={sp500Change} nasdaq={nasdaqChange} />
       )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="flex min-h-0 flex-1 flex-col">{content}</div>;
+  }
+
+  return (
+    <div className="module flex flex-col" style={{ height: "clamp(320px, 24vw, 520px)" }}>
+      {content}
     </div>
   );
 }
@@ -217,7 +244,8 @@ function ComparisonSummary({
   const sSp = sign(diffSp);
   const sNq = sign(diffNq);
 
-  const wrapperClass = "text-xs text-text-secondary leading-relaxed px-4 py-2.5 border-t border-seam/60";
+  const wrapperClass =
+    "shrink-0 border-t border-seam/60 px-3 py-2 text-[11px] leading-relaxed text-text-secondary";
 
   if (sSp > 0 && sNq > 0) {
     return (

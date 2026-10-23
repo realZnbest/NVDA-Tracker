@@ -32,6 +32,7 @@ import { computeAggregatePosition } from "@/lib/position";
 import { usePersistentState } from "@/lib/use-persistent-state";
 import { usePoll } from "@/lib/use-poll";
 import { useAlertsContext } from "./alerts-provider";
+import { IconSliders } from "./icons";
 
 const CH = {
   price: "#79b900",
@@ -97,13 +98,56 @@ const DEFAULT_LAYERS: Layers = {
  *  keeps tracking the live bar instead of freezing at whatever it loaded on arrival. */
 const REFRESH_INTERVAL_MS = 60_000;
 
+/** Target spacing for the default 1H view: on wide cockpits add bars instead of fattening them. */
+const TARGET_1H_BAR_SPACING = 9;
+
+/** Stay two days short of the 1M tab (30 days) so the two tabs never collapse into one view. */
+const RESPONSIVE_1H_CAP_DAYS = 28;
+
+/**
+ * How many bars the default view should show for a timeframe. Range tabs keep their
+ * semantic window (1D is one day, 1M is one month); the interval-based 1H tab widens
+ * its window on large charts until bars sit near TARGET_1H_BAR_SPACING apart, capped
+ * just under the 1M scope.
+ */
+function defaultVisibleBars(
+  times: number[],
+  timeframe: TimeframeKey,
+  chartWidth: number
+): number {
+  if (times.length === 0) return 0;
+  const tf = TIMEFRAMES.find((t) => t.key === timeframe);
+  const lastTime = times[times.length - 1];
+  let fromTime: number;
+  if (tf?.scopeDays === "ytd") {
+    const lastDate = new Date(lastTime * 1000);
+    fromTime = Date.UTC(lastDate.getUTCFullYear(), 0, 1) / 1000;
+  } else if (tf) {
+    fromTime = lastTime - tf.scopeDays * 24 * 60 * 60;
+  } else {
+    fromTime = times[0];
+  }
+  const fromIndex = times.findIndex((t) => t >= Math.max(fromTime, times[0]));
+  const scopeStart = fromIndex === -1 ? times.length - 1 : fromIndex;
+  const scopeBars = times.length - scopeStart;
+  if (timeframe !== "1H") return scopeBars;
+
+  const capFrom = times.findIndex(
+    (t) => t >= lastTime - RESPONSIVE_1H_CAP_DAYS * 24 * 60 * 60
+  );
+  const capBars = capFrom === -1 ? times.length : times.length - capFrom;
+  return Math.min(
+    Math.max(scopeBars, Math.round(chartWidth / TARGET_1H_BAR_SPACING)),
+    Math.max(scopeBars, capBars)
+  );
+}
+
 interface PriceChartProps {
   symbol?: string;
   timeframe: TimeframeKey;
-  onTimeframeChange: (tf: TimeframeKey) => void;
 }
 
-export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: PriceChartProps) {
+export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick" | "Line" | "Histogram">>>({});
@@ -122,7 +166,6 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
    *  fresh data apart from a still-in-flight timeframe switch's stale previous data. */
   const [candlesTimeframe, setCandlesTimeframe] = useState<TimeframeKey | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [storedParams, setParams] = usePersistentState<Params>("nvda.chart.params", DEFAULT_PARAMS);
   const [storedLayers, setLayers] = usePersistentState<Layers>("nvda.chart.layers", DEFAULT_LAYERS);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -191,7 +234,6 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
           }
           setCandles(data.candles);
           setCandlesTimeframe(timeframe);
-          setUpdatedAt(Date.now());
           setStatus("ready");
         })
         .catch(() => {
@@ -331,10 +373,10 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
     };
 
     const panes = chart.panes();
-    panes[0]?.setStretchFactor(5);
-    panes[1]?.setStretchFactor(1.1);
-    if (panes[2]) panes[2].setStretchFactor(1.3);
-    if (panes[3]) panes[3].setStretchFactor(1.3);
+    panes[0]?.setStretchFactor(7);
+    panes[1]?.setStretchFactor(0.9);
+    if (panes[2]) panes[2].setStretchFactor(1.05);
+    if (panes[3]) panes[3].setStretchFactor(1.05);
 
     return () => {
       chart.remove();
@@ -404,7 +446,28 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
     srLinesRef.current.forEach((l) => s.candle.removePriceLine(l));
     srLinesRef.current = [];
     if (showSR) {
+      // Levels are derived from a wider structure window than the visible one; a level
+      // below the visible low (or above the visible high) would otherwise pin its axis
+      // label to the pane edge and overlap the time axis. Keep only levels the current
+      // view can actually show.
+      const targetBars = defaultVisibleBars(
+        candles.t,
+        timeframe,
+        chartRef.current?.timeScale().width() ?? 0
+      );
+      // Include the two padding bars the chart shows to the left of the scoped window.
+      const visibleStart = Math.max(0, candles.t.length - targetBars - 2);
+      let visibleHigh = -Infinity;
+      let visibleLow = Infinity;
+      for (let i = visibleStart; i < candles.t.length; i++) {
+        visibleHigh = Math.max(visibleHigh, candles.h[i]);
+        visibleLow = Math.min(visibleLow, candles.l[i]);
+      }
+      const levelPad = (visibleHigh - visibleLow) * 0.02;
       for (const level of computed.sr) {
+        if (level.price < visibleLow - levelPad || level.price > visibleHigh + levelPad) {
+          continue;
+        }
         const isResistance = level.type === "resistance";
         srLinesRef.current.push(
           s.candle.createPriceLine({
@@ -457,6 +520,7 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
     showSR,
     showStructure,
     avgCost,
+    timeframe,
   ]);
 
   // Scope the default view to what the selected tab means (e.g. "1D" opens on the last
@@ -477,21 +541,19 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
     if (scopedRef.current === timeframe) return;
     scopedRef.current = timeframe;
 
-    const tf = TIMEFRAMES.find((t) => t.key === timeframe);
-    const lastTime = times[times.length - 1];
-    let fromTime: number;
-    if (tf?.scopeDays === "ytd") {
-      const lastDate = new Date(lastTime * 1000);
-      fromTime = Date.UTC(lastDate.getUTCFullYear(), 0, 1) / 1000;
-    } else if (tf) {
-      fromTime = lastTime - tf.scopeDays * 24 * 60 * 60;
-    } else {
-      fromTime = times[0];
-    }
+    const targetBars = defaultVisibleBars(
+      times,
+      timeframe,
+      chartRef.current.timeScale().width()
+    );
 
-    chartRef.current.timeScale().setVisibleRange({
-      from: Math.max(fromTime, times[0]) as UTCTimestamp,
-      to: lastTime as UTCTimestamp,
+    // Keep a small breathing room at both edges so the first/last time labels are not
+    // sliced in half by the canvas boundary. Two bars of padding also keeps the newest
+    // candle from sitting flush against the price scale.
+    const visibleStart = Math.max(0, times.length - targetBars);
+    chartRef.current.timeScale().setVisibleLogicalRange({
+      from: Math.max(0, visibleStart - 2),
+      to: times.length - 1 + 2,
     });
   }, [candles, candlesTimeframe, timeframe]);
 
@@ -564,66 +626,185 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
     };
   }, [settingsOpen]);
 
-  const panesVisible = 2 + (showRsi ? 1 : 0) + (showMacd ? 1 : 0);
+  const activeLayerCount = Object.values(layers).filter(Boolean).length;
 
   return (
-    <div className="module flex flex-col">
-      <div className="relative flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-seam px-4 py-2.5">
-        <div className="flex items-center gap-1">
-          {TIMEFRAMES.map((tf) => (
-            <button
-              key={tf.key}
-              onClick={() => onTimeframeChange(tf.key)}
-              className={`telemetry rounded px-2 py-1 text-[0.6875rem] transition-colors ${
-                timeframe === tf.key
-                  ? "bg-ch-price-dim text-ch-price"
-                  : "text-text-muted hover:text-text-secondary"
-              }`}
-            >
-              {tf.key}
-            </button>
-          ))}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="relative z-20 flex shrink-0 items-center gap-2 border-b border-seam/60 pl-3 pr-1.5">
+        <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-x-3.5 overflow-x-auto whitespace-nowrap py-1.5 telemetry text-[11px]">
+          {readout ? (
+            <>
+              <span className="text-text-muted">
+                {formatBarTime(readout.time, timeframe)}
+                {readout.live && <span className="ml-1.5 text-ch-price">· ล่าสุด</span>}
+              </span>
+              <ReadoutValue label="O" value={readout.open.toFixed(2)} />
+              <ReadoutValue label="H" value={readout.high.toFixed(2)} />
+              <ReadoutValue label="L" value={readout.low.toFixed(2)} />
+              <ReadoutValue label="C" value={readout.close.toFixed(2)} />
+              <span style={{ color: readout.change >= 0 ? "var(--up)" : "var(--down)" }}>
+                {readout.change >= 0 ? "+" : ""}
+                {readout.change.toFixed(2)} ({readout.changePercent.toFixed(2)}%)
+              </span>
+              <ReadoutValue label="VOL" value={formatVolume(readout.volume)} color={CH.volume} />
+              {showRsi && readout.rsi !== null && (
+                <ReadoutValue label="RSI" value={readout.rsi.toFixed(1)} color={CH.rsi} />
+              )}
+              {showMacd && readout.macd !== null && (
+                <ReadoutValue label="MACD" value={readout.macd.toFixed(3)} color={CH.macd} />
+              )}
+            </>
+          ) : (
+            <span className="text-text-muted">กำลังโหลดข้อมูล…</span>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-[0.6875rem]">
-          <Toggle label={`MA${params.ma1}`} color={CH.price} active={showMa1} onClick={() => toggleLayer("ma1")} />
-          <Toggle label={`MA${params.ma2}`} color="#8fb8ff" active={showMa2} onClick={() => toggleLayer("ma2")} />
-          <Toggle label={`MA${params.ma3}`} color="#ff9f6e" active={showMa3} onClick={() => toggleLayer("ma3")} />
-          <Toggle label="Bollinger" color="#9aa4b2" active={showBollinger} onClick={() => toggleLayer("bollinger")} />
-          <Toggle label={`RSI ${params.rsiPeriod}`} color={CH.rsi} active={showRsi} onClick={() => toggleLayer("rsi")} />
-          <Toggle label={`RSI MA${params.rsiMaPeriod}`} color={CH.rsiMa} active={showRsiMa} onClick={() => toggleLayer("rsiMa")} />
-          <Toggle label="MACD" color={CH.macd} active={showMacd} onClick={() => toggleLayer("macd")} />
-          <Toggle label="แนวรับ/แนวต้าน" color="#9aa4b2" active={showSR} onClick={() => toggleLayer("sr")} />
-          <Toggle label="BOS/CHoCH" color={CH.choch} active={showStructure} onClick={() => toggleLayer("structure")} />
-        </div>
-
-        <div ref={settingsRef} className="ml-auto text-[0.6875rem] text-text-muted">
+        <div ref={settingsRef} className="relative shrink-0">
           <button
             type="button"
             onClick={() => setSettingsOpen((v) => !v)}
             aria-expanded={settingsOpen}
-            className={`cursor-pointer select-none transition-colors ${
-              settingsOpen ? "text-ch-price" : "hover:text-text-secondary"
+            aria-haspopup="dialog"
+            className={`flex cursor-pointer select-none items-center gap-1.5 rounded-[2px] px-2 py-1 text-[10px] transition-colors ${
+              settingsOpen
+                ? "bg-panel-2 text-ch-price"
+                : "text-text-muted hover:bg-white/[0.04] hover:text-text-secondary"
             }`}
           >
-            ตัวชี้วัด
+            <IconSliders className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">ตัวชี้วัด</span>
+            <span className="telemetry rounded-[2px] bg-white/[0.06] px-1 text-[9px] leading-4 text-text-secondary">
+              {activeLayerCount}
+            </span>
           </button>
+
           {settingsOpen && (
-            <div className="absolute right-4 mt-2 module p-3 flex flex-col gap-2 z-30">
-              <ParamField label="MA เร็ว" value={params.ma1} onChange={(v) => setParams((p) => ({ ...p, ma1: v }))} />
-              <ParamField label="MA กลาง" value={params.ma2} onChange={(v) => setParams((p) => ({ ...p, ma2: v }))} />
-              <ParamField label="MA ช้า" value={params.ma3} onChange={(v) => setParams((p) => ({ ...p, ma3: v }))} />
-              <ParamField label="Bollinger คาบ" value={params.bbPeriod} onChange={(v) => setParams((p) => ({ ...p, bbPeriod: v }))} />
-              <ParamField label="RSI คาบ" value={params.rsiPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiPeriod: v }))} />
-              <ParamField label="RSI MA คาบ" value={params.rsiMaPeriod} onChange={(v) => setParams((p) => ({ ...p, rsiMaPeriod: v }))} />
-              <ParamField label="ช่วงยืนยันจุดกลับตัว" value={params.swingBars} onChange={(v) => setParams((p) => ({ ...p, swingBars: v }))} />
+            <div
+              role="dialog"
+              aria-label="ตั้งค่าตัวชี้วัด"
+              className="absolute right-0 top-full z-50 mt-1 w-[292px] rounded-sm border border-seam bg-panel-2 p-3 shadow-[0_16px_40px_rgba(0,0,0,0.6)]"
+            >
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="module-label">เลเยอร์บนกราฟ</span>
+                <span className="telemetry text-[9px] text-text-muted">
+                  {activeLayerCount} เปิด
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <LayerSwitch
+                  label={`MA ${params.ma1}`}
+                  color={CH.price}
+                  active={showMa1}
+                  onClick={() => toggleLayer("ma1")}
+                />
+                <LayerSwitch
+                  label={`MA ${params.ma2}`}
+                  color="#8fb8ff"
+                  active={showMa2}
+                  onClick={() => toggleLayer("ma2")}
+                />
+                <LayerSwitch
+                  label={`MA ${params.ma3}`}
+                  color="#ff9f6e"
+                  active={showMa3}
+                  onClick={() => toggleLayer("ma3")}
+                />
+                <LayerSwitch
+                  label="Bollinger Bands"
+                  color="#9aa4b2"
+                  active={showBollinger}
+                  onClick={() => toggleLayer("bollinger")}
+                />
+                <LayerSwitch
+                  label="แนวรับ / แนวต้าน"
+                  color="#9aa4b2"
+                  active={showSR}
+                  onClick={() => toggleLayer("sr")}
+                />
+                <LayerSwitch
+                  label="BOS / CHoCH"
+                  color={CH.choch}
+                  active={showStructure}
+                  onClick={() => toggleLayer("structure")}
+                />
+              </div>
+
+              <div className="my-2 border-t border-seam" />
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="module-label">ออสซิลเลเตอร์</span>
+                <span className="telemetry text-[9px] text-text-muted">แผงล่าง</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <LayerSwitch
+                  label={`RSI ${params.rsiPeriod}`}
+                  color={CH.rsi}
+                  active={showRsi}
+                  onClick={() => toggleLayer("rsi")}
+                />
+                <LayerSwitch
+                  label={`RSI MA ${params.rsiMaPeriod}`}
+                  color={CH.rsiMa}
+                  active={showRsiMa}
+                  onClick={() => toggleLayer("rsiMa")}
+                />
+                <LayerSwitch
+                  label="MACD"
+                  color={CH.macd}
+                  active={showMacd}
+                  onClick={() => toggleLayer("macd")}
+                />
+              </div>
+
+              <details className="mt-2 border-t border-seam pt-2">
+                <summary className="cursor-pointer select-none text-[10px] text-text-muted transition-colors hover:text-text-secondary">
+                  ปรับคาบเวลา
+                </summary>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                  <ParamField
+                    label="MA เร็ว"
+                    value={params.ma1}
+                    onChange={(v) => setParams((p) => ({ ...p, ma1: v }))}
+                  />
+                  <ParamField
+                    label="MA กลาง"
+                    value={params.ma2}
+                    onChange={(v) => setParams((p) => ({ ...p, ma2: v }))}
+                  />
+                  <ParamField
+                    label="MA ช้า"
+                    value={params.ma3}
+                    onChange={(v) => setParams((p) => ({ ...p, ma3: v }))}
+                  />
+                  <ParamField
+                    label="BB คาบ"
+                    value={params.bbPeriod}
+                    onChange={(v) => setParams((p) => ({ ...p, bbPeriod: v }))}
+                  />
+                  <ParamField
+                    label="RSI"
+                    value={params.rsiPeriod}
+                    onChange={(v) => setParams((p) => ({ ...p, rsiPeriod: v }))}
+                  />
+                  <ParamField
+                    label="RSI MA"
+                    value={params.rsiMaPeriod}
+                    onChange={(v) => setParams((p) => ({ ...p, rsiMaPeriod: v }))}
+                  />
+                  <ParamField
+                    label="Swing"
+                    value={params.swingBars}
+                    onChange={(v) => setParams((p) => ({ ...p, swingBars: v }))}
+                  />
+                </div>
+              </details>
+
               <button
                 type="button"
                 onClick={() => {
                   setParams(DEFAULT_PARAMS);
                   setLayers(DEFAULT_LAYERS);
                 }}
-                className="mt-1 rounded border border-seam px-2 py-1 text-[0.6875rem] text-text-muted transition-colors hover:text-text-primary"
+                className="mt-2.5 w-full rounded-[2px] border border-seam px-2 py-1 text-[10px] text-text-muted transition-colors hover:text-text-primary"
               >
                 คืนค่าเริ่มต้น
               </button>
@@ -632,40 +813,12 @@ export function PriceChart({ symbol = "NVDA", timeframe, onTimeframeChange }: Pr
         </div>
       </div>
 
-      {readout && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-seam/60 px-4 py-1.5 telemetry text-[0.6875rem]">
-          <span className="text-text-muted">
-            {formatBarTime(readout.time, timeframe)}
-            {readout.live && <span className="ml-1.5 text-ch-price">· ล่าสุด</span>}
-          </span>
-          <ReadoutValue label="O" value={readout.open.toFixed(2)} />
-          <ReadoutValue label="H" value={readout.high.toFixed(2)} />
-          <ReadoutValue label="L" value={readout.low.toFixed(2)} />
-          <ReadoutValue label="C" value={readout.close.toFixed(2)} />
-          <span style={{ color: readout.change >= 0 ? "var(--up)" : "var(--down)" }}>
-            {readout.change >= 0 ? "+" : ""}
-            {readout.change.toFixed(2)} ({readout.changePercent.toFixed(2)}%)
-          </span>
-          <ReadoutValue label="VOL" value={formatVolume(readout.volume)} color={CH.volume} />
-          {showRsi && readout.rsi !== null && (
-            <ReadoutValue label="RSI" value={readout.rsi.toFixed(1)} color={CH.rsi} />
-          )}
-          {showMacd && readout.macd !== null && (
-            <ReadoutValue label="MACD" value={readout.macd.toFixed(3)} color={CH.macd} />
-          )}
-          {updatedAt !== null && (
-            <span className="ml-auto text-text-muted">
-              อัปเดต {new Date(updatedAt).toLocaleTimeString("th-TH")}
-            </span>
-          )}
-        </div>
-      )}
-
-      <div
-        className="relative"
-        style={{ height: `calc(clamp(200px, 11vw, 480px) + ${panesVisible} * clamp(130px, 7vw, 190px))` }}
-      >
-        <div ref={containerRef} className="absolute inset-0" />
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={containerRef}
+          className="absolute inset-0 transition-opacity duration-300 ease-out motion-reduce:transition-none"
+          style={{ opacity: status === "ready" ? 1 : 0 }}
+        />
         {status === "loading" && <ChartOverlay text="กำลังโหลดข้อมูลราคา…" />}
         {status === "no_key" && (
           <ChartOverlay text="ยังไม่ได้ตั้งค่า FINNHUB_API_KEY — ใส่คีย์ใน .env.local แล้วรีสตาร์ทเซิร์ฟเวอร์" />
@@ -710,7 +863,7 @@ function formatBarTime(seconds: number, timeframe: TimeframeKey): string {
   });
 }
 
-function Toggle({
+function LayerSwitch({
   label,
   color,
   active,
@@ -723,12 +876,39 @@ function Toggle({
 }) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={active}
       onClick={onClick}
-      className="flex items-center gap-1.5 telemetry rounded px-1.5 py-1 transition-opacity"
-      style={{ opacity: active ? 1 : 0.4 }}
+      className="flex items-center gap-2 rounded-[2px] px-1.5 py-1 text-left transition-colors hover:bg-white/[0.04]"
     >
-      <span className="h-2 w-2 rounded-sm" style={{ background: color }} />
-      <span className={active ? "text-text-secondary" : "text-text-muted"}>{label}</span>
+      <span
+        className="h-2 w-2 shrink-0 rounded-[1px]"
+        style={{ background: color, opacity: active ? 1 : 0.35 }}
+      />
+      <span
+        className={`flex-1 text-[11px] ${
+          active ? "text-text-secondary" : "text-text-muted"
+        }`}
+      >
+        {label}
+      </span>
+      <span
+        className="relative h-3 w-[22px] shrink-0 rounded-full transition-colors"
+        style={{
+          background: active
+            ? `color-mix(in srgb, ${color} 30%, transparent)`
+            : "var(--seam)",
+        }}
+      >
+        <span
+          className="absolute top-[2px] h-2 w-2 rounded-full transition-all"
+          style={{
+            left: active ? 12 : 2,
+            background: active ? color : "var(--text-muted)",
+          }}
+        />
+      </span>
     </button>
   );
 }
@@ -743,15 +923,15 @@ function ParamField({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 text-text-muted">
-      {label}
+    <label className="flex items-center justify-between gap-2 text-[10px] text-text-muted">
+      <span className="truncate">{label}</span>
       <input
         type="number"
         value={value}
         min={2}
         max={400}
         onChange={(e) => onChange(Number(e.target.value) || value)}
-        className="telemetry w-14 rounded border border-seam bg-panel-2 px-1.5 py-0.5 text-right text-text-primary"
+        className="telemetry w-11 rounded-[2px] border border-seam bg-panel px-1 py-0.5 text-right text-[10px] text-text-primary"
       />
     </label>
   );

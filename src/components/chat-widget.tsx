@@ -125,10 +125,11 @@ export function ChatWidget({ symbol }: { symbol: string }) {
 
       <button
         onClick={() => setOpen((v) => !v)}
-        className="module flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm text-text-primary hover:brightness-110 transition-[filter]"
+        aria-label="ถามคำถาม"
+        className="module flex items-center gap-1.5 rounded-full px-3 py-2.5 text-sm text-text-primary transition-[filter] hover:brightness-110 sm:px-4"
       >
         <IconSpark className="h-4 w-4 text-ch-rsi" />
-        ถามคำถาม
+        <span className="hidden sm:inline">ถามคำถาม</span>
       </button>
     </div>
   );

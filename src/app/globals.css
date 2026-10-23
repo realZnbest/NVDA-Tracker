@@ -223,6 +223,11 @@ body {
     letter-spacing: 0.01em;
   }
 
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--seam-bright) transparent;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -235,6 +240,17 @@ body {
 
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  /* Rail/timeframe strips scroll horizontally by touch or wheel; a visible scrollbar
+     there reads as broken layout rather than as affordance. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 
   .lit {
