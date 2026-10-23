@@ -11,6 +11,7 @@ import { AnalystPanel } from "@/components/analyst-panel";
 import { EarningsCountdown } from "@/components/earnings-countdown";
 import { BenchmarkChart } from "@/components/benchmark-chart";
 import { ChatWidget } from "@/components/chat-widget";
+import { IconSliders, IconSpark, IconStar, IconWave } from "@/components/icons";
 
 // NVDA keeps its original flat storage key so an existing owner's saved timeframe
 // carries over unchanged; every other symbol gets its own key so tab selection
@@ -21,11 +22,18 @@ function timeframeStorageKey(symbol: string): string {
 
 type ChartView = "price" | "compare";
 type InspectorTab = "analysis" | "street" | "events";
+type MobileTab = "chart" | "analysis" | "watchlist";
 
 const INSPECTOR_TABS: { key: InspectorTab; label: string }[] = [
   { key: "analysis", label: "วิเคราะห์" },
   { key: "street", label: "นักวิเคราะห์" },
   { key: "events", label: "เหตุการณ์" },
+];
+
+const MOBILE_TABS: { key: MobileTab; label: string; icon: typeof IconWave }[] = [
+  { key: "chart", label: "กราฟ", icon: IconWave },
+  { key: "analysis", label: "วิเคราะห์", icon: IconSliders },
+  { key: "watchlist", label: "รายการ", icon: IconStar },
 ];
 
 export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
@@ -42,6 +50,11 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
   // the initial dashboard load to one chart's worth of requests, while keeping it alive
   // afterwards so flipping back and forth doesn't refetch.
   const [compareMounted, setCompareMounted] = useState(false);
+  // Below `lg` the dashboard is a stock-app-style shell: one full-height panel at a
+  // time, with the chart as the default. The chart and inspector stay mounted while
+  // hidden so tab switches keep zoom, settings and fetched panels alive.
+  const [mobileTab, setMobileTab] = useState<MobileTab>("chart");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (view === "compare") setCompareMounted(true);
@@ -50,14 +63,19 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
   const activeTimeframe = TIMEFRAMES.find((tf) => tf.key === timeframe);
 
   return (
-    <div className="mx-auto flex w-full flex-col gap-3 px-2 py-2 lg:gap-4 xl:h-full xl:min-h-0">
+    <div className="mx-auto flex w-full flex-col gap-3 px-2 py-2 max-lg:h-[calc(100dvh-47px)] max-lg:gap-0 max-lg:overflow-hidden max-lg:px-0 max-lg:py-0 lg:gap-4 xl:h-full xl:min-h-0">
       <QuoteHeader symbol={symbol} />
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-4 xl:min-h-0 xl:flex-1 xl:gap-3 xl:grid-cols-[180px_minmax(0,1fr)_290px]">
-        <WatchlistRail symbol={symbol} />
+      <div className="grid min-h-0 grid-cols-1 gap-3 max-lg:flex max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col max-lg:gap-0 lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-4 xl:min-h-0 xl:flex-1 xl:gap-3 xl:grid-cols-[180px_minmax(0,1fr)_290px]">
+        <WatchlistRail
+          symbol={symbol}
+          className={`${mobileTab === "watchlist" ? "flex" : "hidden"} max-lg:flex-1 lg:flex`}
+        />
 
         <section
-          className="module flex h-[clamp(480px,calc(100dvh-13rem),880px)] min-h-0 flex-col lg:col-start-2 lg:row-start-1 xl:h-auto"
+          className={`module module-mobile-flat h-[clamp(480px,calc(100dvh-13rem),880px)] min-h-0 flex-col max-lg:h-auto max-lg:flex-1 ${
+            mobileTab === "chart" ? "flex" : "hidden"
+          } lg:col-start-2 lg:row-start-1 lg:flex xl:h-auto`}
           aria-label="พื้นที่กราฟ"
         >
           <div className="flex shrink-0 items-center gap-3 border-b border-seam px-3 py-2">
@@ -129,7 +147,9 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
         </section>
 
         <aside
-          className="module flex min-h-0 flex-col overflow-hidden lg:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1"
+          className={`module module-mobile-flat min-h-0 flex-col overflow-hidden max-lg:flex-1 ${
+            mobileTab === "analysis" ? "flex" : "hidden"
+          } lg:col-span-2 lg:flex xl:col-span-1 xl:col-start-3 xl:row-start-1`}
           aria-label="บทวิเคราะห์และเหตุการณ์"
         >
           <div
@@ -158,7 +178,7 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
             ))}
           </div>
 
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pb-14">
+          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pb-14 max-lg:pb-0">
             <div hidden={inspectorTab !== "analysis"} role="tabpanel">
               <AnalysisPanel symbol={symbol} timeframe={timeframe} embedded />
             </div>
@@ -172,8 +192,81 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
         </aside>
       </div>
 
-      <ChatWidget symbol={symbol} />
+      <MobileTabBar
+        active={mobileTab}
+        onSelect={(tab) => {
+          setChatOpen(false);
+          setMobileTab(tab);
+        }}
+        chatOpen={chatOpen}
+        onToggleChat={() => setChatOpen((v) => !v)}
+      />
+
+      <ChatWidget
+        symbol={symbol}
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+      />
     </div>
+  );
+}
+
+function MobileTabBar({
+  active,
+  onSelect,
+  chatOpen,
+  onToggleChat,
+}: {
+  active: MobileTab;
+  onSelect: (tab: MobileTab) => void;
+  chatOpen: boolean;
+  onToggleChat: () => void;
+}) {
+  return (
+    <nav
+      className="shrink-0 border-t border-seam bg-bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+      aria-label="แท็บแดชบอร์ด"
+    >
+      <div className="grid grid-cols-4">
+        {MOBILE_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const selected = active === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onSelect(tab.key)}
+              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] leading-none transition-colors ${
+                selected
+                  ? "text-ch-price"
+                  : "text-text-muted hover:text-text-secondary"
+              }`}
+            >
+              {selected && (
+                <span className="absolute inset-x-4 top-0 h-[2px] rounded-full bg-ch-price" />
+              )}
+              <Icon className="h-[18px] w-[18px]" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-expanded={chatOpen}
+          aria-label="ถาม AI"
+          onClick={onToggleChat}
+          className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] leading-none transition-colors ${
+            chatOpen
+              ? "text-ch-rsi"
+              : "text-text-muted hover:text-text-secondary"
+          }`}
+        >
+          <IconSpark className="h-[18px] w-[18px]" />
+          <span>AI</span>
+        </button>
+      </div>
+    </nav>
   );
 }
 

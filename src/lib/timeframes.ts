@@ -27,7 +27,9 @@ export const TIMEFRAMES: Timeframe[] = [
   // scopeDays counts calendar days, and weekends carry no bars — 5 calendar days can
   // collapse to as few as 3 trading sessions (~22 hourly bars), rendering as a handful
   // of fat, sparse candles. 20 keeps roughly three trading weeks (~100 hourly bars), which
-  // fills the wide cockpit chart without the candles turning fat or the view losing focus.
+  // fills the wide desktop cockpit without the candles turning fat or the view losing
+  // focus. The price chart narrows this to 5 days on compact viewports; analysis and
+  // comparison views keep the 20-day scope below.
   { key: "1H", label: "1 ชั่วโมง", yahooRange: "2y", yahooInterval: "60m", scopeDays: 20 },
   // Yahoo hard limit: 5m bars are only available for roughly the last 60 days.
   { key: "1D", label: "1 วัน", yahooRange: "60d", yahooInterval: "5m", scopeDays: 1 },
@@ -48,8 +50,8 @@ export const SYMBOL = "NVDA";
 /**
  * Slices a candle set down to the semantic window the selected tab is scoped to (e.g.
  * "1D" means the last day), not the full over-fetched history kept for zoom-out
- * headroom. The 1H price chart may widen its visible window on large screens, but
- * analysis and comparison views stay on this fixed scope.
+ * headroom. The 1H price chart narrows its window on compact viewports and may widen it
+ * on large screens, but analysis and comparison views stay on this fixed scope.
  */
 export function scopeCandles(candles: FinnhubCandles, key: TimeframeKey): FinnhubCandles {
   const times = candles.t;

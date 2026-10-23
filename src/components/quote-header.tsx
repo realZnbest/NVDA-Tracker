@@ -150,7 +150,7 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
 
   return (
     <div
-      className="module relative px-4 py-2.5 sm:px-5"
+      className="module module-mobile-flat relative shrink-0 px-4 py-2.5 max-lg:border-b max-lg:border-solid max-lg:border-seam/60 max-lg:px-3 max-lg:py-1.5 lg:px-5"
       style={{
         backgroundImage: extended
           ? `radial-gradient(ellipse 340px 230px at 0% 0%, ${SESSION_GLOW[extended.session]}, transparent 70%)`
@@ -158,16 +158,16 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
       }}
       title={extended ? `สถานะตลาด: ${SESSION_LABEL_TH[extended.session]}` : undefined}
     >
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <TickerLogo symbol={symbol} className="h-9 w-9 sm:h-10 sm:w-10" />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 max-lg:gap-x-2.5 max-lg:gap-y-0">
+        <div className="flex min-w-0 items-center gap-2.5 max-lg:gap-1.5">
+          <TickerLogo symbol={symbol} className="h-7 w-7 lg:h-10 lg:w-10" />
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="telemetry text-base font-semibold tracking-[0.02em] text-text-primary">
+            <div className="flex items-center gap-2 max-lg:gap-1">
+              <h1 className="telemetry text-base font-semibold tracking-[0.02em] text-text-primary max-lg:text-sm">
                 {symbol}
               </h1>
               {exchange && (
-                <span className="telemetry rounded-[2px] bg-ch-price-dim px-1.5 py-0.5 text-[9px] leading-none text-ch-price">
+                <span className="telemetry rounded-[2px] bg-ch-price-dim px-1.5 py-0.5 text-[9px] leading-none text-ch-price max-lg:hidden">
                   {exchange}
                 </span>
               )}
@@ -195,24 +195,24 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
                 </span>
               </button>
             </div>
-            <p className="mt-0.5 max-w-[230px] truncate text-xs leading-tight text-text-secondary">
+            <p className="mt-0.5 max-w-[230px] truncate text-xs leading-tight text-text-secondary max-lg:hidden">
               {companyName ?? (symbol === "NVDA" ? "NVIDIA CORPORATION" : symbol)}
             </p>
           </div>
         </div>
 
-        <div className="order-last flex w-full min-w-0 flex-col justify-center sm:order-none sm:w-auto sm:border-l sm:border-seam sm:pl-5">
+        <div className="order-last flex w-full min-w-0 flex-col justify-center max-lg:mt-0.5 max-lg:flex-row max-lg:items-baseline max-lg:justify-start max-lg:border-0 max-lg:pl-0 lg:order-none lg:w-auto lg:border-l lg:border-seam lg:pl-5">
           {status === "ready" && quote ? (
             <>
-              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 max-lg:flex-nowrap max-lg:gap-x-1.5">
                 <span
-                  className="telemetry text-[1.75rem] font-medium leading-none sm:text-[2rem]"
+                  className="telemetry text-[1.35rem] font-medium leading-none lg:text-[2rem]"
                   style={{ color: priceColor }}
                 >
                   ${mainPrice!.toFixed(2)}
                 </span>
                 <span
-                  className="telemetry flex items-center gap-0.5 rounded-[2px] px-1.5 py-1 text-[11px] leading-none"
+                  className="telemetry flex items-center gap-0.5 whitespace-nowrap rounded-[2px] px-1.5 py-1 text-[11px] leading-none max-lg:px-1 max-lg:py-0.5 max-lg:text-[10px]"
                   style={{
                     color: priceColor,
                     backgroundColor: `color-mix(in srgb, ${priceColor} 12%, transparent)`,
@@ -233,7 +233,7 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
                 )}
               </div>
               {quoteTimestamp && (
-                <p className="telemetry mt-1 text-[10px] leading-none text-text-muted xl:hidden">
+                <p className="telemetry mt-1 text-[10px] leading-none text-text-muted xl:hidden max-lg:hidden">
                   {useRegularPrice ? "ราคาปิดตลาดล่าสุด · " : ""}
                   ข้อมูล ณ {quoteTimestamp}
                 </p>
@@ -246,8 +246,8 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
           ) : status === "error" ? (
             <p className="text-xs text-text-muted">โหลดราคาล่าสุดไม่สำเร็จ</p>
           ) : (
-            <div className="flex flex-col gap-2">
-              <span className="telemetry animate-pulse text-[1.75rem] leading-none text-text-muted sm:text-[2rem]">
+            <div className="flex flex-col gap-2 max-lg:flex-row max-lg:items-baseline max-lg:gap-1.5">
+              <span className="telemetry animate-pulse text-[1.35rem] leading-none text-text-muted lg:text-[2rem]">
                 — — —
               </span>
               <span className="telemetry text-[10px] text-text-muted">กำลังโหลดราคา…</span>
@@ -258,7 +258,7 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
         {status === "ready" && quote && (
           <DayStats
             quote={quote}
-            className="ml-auto hidden items-center gap-5 border-l border-seam pl-5 sm:flex"
+            className="ml-auto hidden items-center gap-5 border-l border-seam pl-5 lg:flex"
           />
         )}
 
@@ -287,15 +287,8 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
         </div>
       )}
 
-      {status === "ready" && quote && (
-        <DayStats
-          quote={quote}
-          className="mt-2.5 grid grid-cols-4 gap-2 border-t border-seam/60 pt-2 sm:hidden"
-        />
-      )}
-
       {status === "ready" && extended && (extended.pre || extended.post) && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-seam/60 pt-2">
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-seam/60 pt-2 max-lg:mt-1 max-lg:gap-x-3 max-lg:gap-y-0.5 max-lg:border-seam/40 max-lg:pt-1.5">
           {extended.pre && (
             <ExtendedRow
               label={SESSION_LABEL_TH.pre}

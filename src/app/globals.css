@@ -209,6 +209,27 @@ body {
     right: 6px;
   }
 
+  /*
+   * Below the cockpit breakpoint the dashboard becomes a full-height app shell: the
+   * quote header, chart, watchlist and inspector give up their card chrome so the chart
+   * can run edge-to-edge. The modules stay mounted (tab switches must not remount the
+   * chart or refetch the panels), so the flat treatment lives on a modifier rather than
+   * a different component tree. Desktop keeps the riveted module cards unchanged.
+   */
+  @media (max-width: 63.999rem) {
+    .module-mobile-flat {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .module-mobile-flat::before,
+    .module-mobile-flat::after {
+      display: none;
+    }
+  }
+
   .module-label {
     font-family: var(--font-mono);
     font-size: 0.625rem;

@@ -8,8 +8,22 @@ const MAX_MESSAGE_LENGTH = 500;
 
 type SendStatus = "idle" | "sending" | "rate_limited" | "unavailable";
 
-export function ChatWidget({ symbol }: { symbol: string }) {
-  const [open, setOpen] = useState(false);
+export function ChatWidget({
+  symbol,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  symbol: string;
+  /** Optional control so the mobile tab bar can own the trigger; desktop keeps the FAB. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next);
+    else setInternalOpen(next);
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<SendStatus>("idle");
@@ -52,10 +66,10 @@ export function ChatWidget({ symbol }: { symbol: string }) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 max-lg:bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] max-lg:right-2">
       {open && (
-        <div className="module flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-seam px-4 py-2.5">
+        <div className="module flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden max-lg:max-h-[calc(100dvh-7.5rem)]">
+          <div className="flex shrink-0 items-center justify-between border-b border-seam px-4 py-2.5">
             <div className="flex items-center gap-1.5">
               <IconSpark className="h-3.5 w-3.5 text-ch-rsi" />
               <span className="module-label">ถามคำถามเกี่ยวกับ {symbol}</span>
@@ -69,14 +83,14 @@ export function ChatWidget({ symbol }: { symbol: string }) {
             </button>
           </div>
 
-          <div className="border-b border-seam bg-ch-alert-dim/40 px-4 py-2">
+          <div className="shrink-0 border-b border-seam bg-ch-alert-dim/40 px-4 py-2">
             <p className="text-[0.6875rem] font-medium leading-relaxed text-ch-alert">
               คำตอบจาก AI อาจไม่ถูกต้องหรือไม่เป็นปัจจุบัน ไม่ใช่คำแนะนำการลงทุน
               โปรดตรวจสอบข้อมูลก่อนตัดสินใจ
             </p>
           </div>
 
-          <div ref={listRef} className="scrollbar-thin flex h-80 flex-col gap-2.5 overflow-y-auto px-4 py-3">
+          <div ref={listRef} className="scrollbar-thin flex h-80 flex-col gap-2.5 overflow-y-auto px-4 py-3 max-lg:h-auto max-lg:min-h-0 max-lg:flex-1">
             {messages.length === 0 && (
               <p className="text-xs text-text-muted">ถามอะไรก็ได้เกี่ยวกับ {symbol} หรือการลงทุนทั่วไป</p>
             )}
@@ -102,7 +116,7 @@ export function ChatWidget({ symbol }: { symbol: string }) {
             )}
           </div>
 
-          <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-seam p-3">
+          <form onSubmit={handleSend} className="flex shrink-0 items-center gap-2 border-t border-seam p-3">
             <input
               type="text"
               value={input}
@@ -124,9 +138,9 @@ export function ChatWidget({ symbol }: { symbol: string }) {
       )}
 
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         aria-label="ถามคำถาม"
-        className="module flex items-center gap-1.5 rounded-full px-3 py-2.5 text-sm text-text-primary transition-[filter] hover:brightness-110 sm:px-4"
+        className="module flex items-center gap-1.5 rounded-full px-3 py-2.5 text-sm text-text-primary transition-[filter] hover:brightness-110 max-lg:hidden sm:px-4"
       >
         <IconSpark className="h-4 w-4 text-ch-rsi" />
         <span className="hidden sm:inline">ถามคำถาม</span>

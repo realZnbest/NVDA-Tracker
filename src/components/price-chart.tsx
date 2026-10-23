@@ -105,15 +105,32 @@ const TARGET_1H_BAR_SPACING = 9;
 const RESPONSIVE_1H_CAP_DAYS = 28;
 
 /**
+ * The 1H tab's 20-day desktop window would squeeze ~100 candles into a phone-width
+ * chart. Compact viewports start at 5 days; the width-aware target below can still add
+ * bars up to the 9px spacing target, so tablets get more context without fat candles.
+ * This only affects the price chart; the analysis/compare views keep their fixed scope.
+ */
+const COMPACT_1H_SCOPE_DAYS = 5;
+
+/** The dashboard switches to the full-height mobile app shell below Tailwind's `lg` (64rem). */
+function isCompactChartViewport(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 63.999rem)").matches
+  );
+}
+
+/**
  * How many bars the default view should show for a timeframe. Range tabs keep their
  * semantic window (1D is one day, 1M is one month); the interval-based 1H tab widens
  * its window on large charts until bars sit near TARGET_1H_BAR_SPACING apart, capped
- * just under the 1M scope.
+ * just under the 1M scope. Compact viewports start from a shorter 1H window.
  */
 function defaultVisibleBars(
   times: number[],
   timeframe: TimeframeKey,
-  chartWidth: number
+  chartWidth: number,
+  compact: boolean
 ): number {
   if (times.length === 0) return 0;
   const tf = TIMEFRAMES.find((t) => t.key === timeframe);
@@ -123,7 +140,9 @@ function defaultVisibleBars(
     const lastDate = new Date(lastTime * 1000);
     fromTime = Date.UTC(lastDate.getUTCFullYear(), 0, 1) / 1000;
   } else if (tf) {
-    fromTime = lastTime - tf.scopeDays * 24 * 60 * 60;
+    const scopeDays =
+      timeframe === "1H" && compact ? COMPACT_1H_SCOPE_DAYS : tf.scopeDays;
+    fromTime = lastTime - scopeDays * 24 * 60 * 60;
   } else {
     fromTime = times[0];
   }
@@ -372,13 +391,23 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
       macdHist: macdHistSeries,
     };
 
-    const panes = chart.panes();
-    panes[0]?.setStretchFactor(7);
-    panes[1]?.setStretchFactor(0.9);
-    if (panes[2]) panes[2].setStretchFactor(1.05);
-    if (panes[3]) panes[3].setStretchFactor(1.05);
+    // On phones the chart is full-height but the four panes still share one canvas;
+    // give the candles a larger slice than the desktop cockpit so the price action
+    // remains the hero while volume/RSI/MACD stay readable subordinate strips.
+    const applyPaneFactors = () => {
+      const compact = isCompactChartViewport();
+      const panes = chart.panes();
+      panes[0]?.setStretchFactor(compact ? 8 : 7);
+      panes[1]?.setStretchFactor(compact ? 0.8 : 0.9);
+      if (panes[2]) panes[2].setStretchFactor(compact ? 0.95 : 1.05);
+      if (panes[3]) panes[3].setStretchFactor(compact ? 0.95 : 1.05);
+    };
+    applyPaneFactors();
+    const paneObserver = new ResizeObserver(applyPaneFactors);
+    paneObserver.observe(containerRef.current);
 
     return () => {
+      paneObserver.disconnect();
       chart.remove();
       chartRef.current = null;
       markersPluginRef.current = null;
@@ -453,7 +482,8 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
       const targetBars = defaultVisibleBars(
         candles.t,
         timeframe,
-        chartRef.current?.timeScale().width() ?? 0
+        chartRef.current?.timeScale().width() ?? 0,
+        isCompactChartViewport()
       );
       // Include the two padding bars the chart shows to the left of the scoped window.
       const visibleStart = Math.max(0, candles.t.length - targetBars - 2);
@@ -544,7 +574,8 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
     const targetBars = defaultVisibleBars(
       times,
       timeframe,
-      chartRef.current.timeScale().width()
+      chartRef.current.timeScale().width(),
+      isCompactChartViewport()
     );
 
     // Keep a small breathing room at both edges so the first/last time labels are not
@@ -631,27 +662,47 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="relative z-20 flex shrink-0 items-center gap-2 border-b border-seam/60 pl-3 pr-1.5">
-        <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-x-3.5 overflow-x-auto whitespace-nowrap py-1.5 telemetry text-[11px]">
+        <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-x-3.5 max-lg:gap-x-2 overflow-x-auto whitespace-nowrap py-1.5 telemetry text-[11px]">
           {readout ? (
             <>
-              <span className="text-text-muted">
+              <span className="max-lg:order-1 text-text-muted">
                 {formatBarTime(readout.time, timeframe)}
-                {readout.live && <span className="ml-1.5 text-ch-price">· ล่าสุด</span>}
+                {readout.live && (
+                  <span className="ml-1.5 text-ch-price max-lg:hidden">· ล่าสุด</span>
+                )}
               </span>
-              <ReadoutValue label="O" value={readout.open.toFixed(2)} />
-              <ReadoutValue label="H" value={readout.high.toFixed(2)} />
-              <ReadoutValue label="L" value={readout.low.toFixed(2)} />
-              <ReadoutValue label="C" value={readout.close.toFixed(2)} />
-              <span style={{ color: readout.change >= 0 ? "var(--up)" : "var(--down)" }}>
+              <ReadoutValue label="O" value={readout.open.toFixed(2)} className="max-lg:order-4" />
+              <ReadoutValue label="H" value={readout.high.toFixed(2)} className="max-lg:order-4" />
+              <ReadoutValue label="L" value={readout.low.toFixed(2)} className="max-lg:order-4" />
+              <ReadoutValue label="C" value={readout.close.toFixed(2)} className="max-lg:order-2" />
+              <span
+                className="max-lg:order-3"
+                style={{ color: readout.change >= 0 ? "var(--up)" : "var(--down)" }}
+              >
                 {readout.change >= 0 ? "+" : ""}
                 {readout.change.toFixed(2)} ({readout.changePercent.toFixed(2)}%)
               </span>
-              <ReadoutValue label="VOL" value={formatVolume(readout.volume)} color={CH.volume} />
+              <ReadoutValue
+                label="VOL"
+                value={formatVolume(readout.volume)}
+                color={CH.volume}
+                className="max-lg:order-5"
+              />
               {showRsi && readout.rsi !== null && (
-                <ReadoutValue label="RSI" value={readout.rsi.toFixed(1)} color={CH.rsi} />
+                <ReadoutValue
+                  label="RSI"
+                  value={readout.rsi.toFixed(1)}
+                  color={CH.rsi}
+                  className="max-lg:order-5"
+                />
               )}
               {showMacd && readout.macd !== null && (
-                <ReadoutValue label="MACD" value={readout.macd.toFixed(3)} color={CH.macd} />
+                <ReadoutValue
+                  label="MACD"
+                  value={readout.macd.toFixed(3)}
+                  color={CH.macd}
+                  className="max-lg:order-5"
+                />
               )}
             </>
           ) : (
@@ -682,7 +733,7 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
             <div
               role="dialog"
               aria-label="ตั้งค่าตัวชี้วัด"
-              className="absolute right-0 top-full z-50 mt-1 w-[292px] rounded-sm border border-seam bg-panel-2 p-3 shadow-[0_16px_40px_rgba(0,0,0,0.6)]"
+              className="scrollbar-thin absolute right-0 top-full z-50 mt-1 max-lg:max-h-[calc(100dvh-15rem)] max-lg:overflow-y-auto w-[292px] rounded-sm border border-seam bg-panel-2 p-3 shadow-[0_16px_40px_rgba(0,0,0,0.6)]"
             >
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="module-label">เลเยอร์บนกราฟ</span>
@@ -833,13 +884,15 @@ function ReadoutValue({
   label,
   value,
   color,
+  className,
 }: {
   label: string;
   value: string;
   color?: string;
+  className?: string;
 }) {
   return (
-    <span className="flex items-center gap-1">
+    <span className={`flex items-center gap-1 ${className ?? ""}`}>
       <span className="text-text-muted">{label}</span>
       <span style={{ color: color ?? "var(--text-primary)" }}>{value}</span>
     </span>

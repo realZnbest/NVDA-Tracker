@@ -33,7 +33,13 @@ function priceText(value: number): string {
   });
 }
 
-export function WatchlistRail({ symbol }: { symbol: string }) {
+export function WatchlistRail({
+  symbol,
+  className,
+}: {
+  symbol: string;
+  className?: string;
+}) {
   const { authStatus } = useAlertsContext();
   const authed = authStatus === "authenticated";
 
@@ -154,7 +160,7 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
 
   return (
     <section
-      className="module flex min-h-0 flex-col lg:col-start-1 lg:row-start-1 lg:h-full"
+      className={`module module-mobile-flat min-h-0 flex-col lg:col-start-1 lg:row-start-1 lg:h-full ${className ?? ""}`}
       aria-label={authed ? "รายการติดตาม" : "ภาพรวมตลาด"}
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-seam px-3 py-2">
@@ -174,16 +180,16 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
       </div>
 
       {loading ? (
-        <div className="scrollbar-none flex gap-1 overflow-x-auto p-1.5 lg:flex-col lg:overflow-visible">
+        <div className="scrollbar-none flex min-h-0 flex-col gap-0.5 overflow-y-auto p-1.5">
           {Array.from({ length: authed ? 6 : 4 }).map((_, index) => (
             <div
               key={index}
-              className="flex w-[112px] shrink-0 items-center gap-2 px-2 py-2 lg:w-full"
+              className="flex w-full shrink-0 items-center gap-2 px-2 py-2"
             >
-              <div className="hidden h-6 w-6 animate-pulse rounded-[3px] bg-white/[0.05] lg:block" />
+              <div className="h-6 w-6 animate-pulse rounded-[3px] bg-white/[0.05]" />
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="h-2 w-10 animate-pulse rounded bg-white/[0.05]" />
-                <div className="hidden h-1.5 w-16 animate-pulse rounded bg-white/[0.04] lg:block" />
+                <div className="h-1.5 w-16 animate-pulse rounded bg-white/[0.04]" />
               </div>
               <div className="h-2 w-9 animate-pulse rounded bg-white/[0.05]" />
             </div>
@@ -220,7 +226,7 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
           </Link>
         </div>
       ) : (
-        <div className="scrollbar-none flex min-h-0 gap-1 overflow-x-auto p-1.5 lg:flex-col lg:gap-0.5 lg:overflow-y-auto lg:overflow-x-hidden">
+        <div className="scrollbar-none flex min-h-0 flex-col gap-0.5 overflow-y-auto p-1.5">
           {rows.map((row) => {
             const quote = quoteFor(row.symbol);
             const active = row.symbol === symbol;
@@ -237,7 +243,7 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
                 key={row.symbol}
                 href={`/dashboard/${encodeURIComponent(row.symbol)}`}
                 aria-current={active ? "page" : undefined}
-                className={`group relative flex w-[112px] shrink-0 items-center gap-2 rounded-[2px] px-2 py-1.5 transition-colors lg:w-full ${
+                className={`group relative flex w-full shrink-0 items-center gap-2 rounded-[2px] px-2 py-1.5 transition-colors ${
                   active ? "bg-panel-2" : "hover:bg-white/[0.03]"
                 }`}
               >
@@ -246,7 +252,7 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
                 )}
                 <TickerLogo
                   symbol={row.symbol}
-                  className="hidden h-6 w-6 lg:flex"
+                  className="flex h-6 w-6"
                   textClassName="text-[9px]"
                 />
                 <div className="min-w-0 flex-1">
@@ -256,7 +262,7 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
                     </span>
                     {active && <span className="h-1 w-1 shrink-0 rounded-full bg-ch-price" />}
                   </div>
-                  <p className="hidden truncate text-[10px] leading-tight text-text-muted lg:block">
+                  <p className="truncate text-[10px] leading-tight text-text-muted">
                     {row.name || "—"}
                   </p>
                 </div>
@@ -277,7 +283,7 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
           {authed && (
             <Link
               href="/watchlist"
-              className="mt-1 hidden w-full items-center justify-center gap-1.5 rounded-[2px] border border-dashed border-seam px-2 py-1.5 text-[10px] text-text-muted transition-colors hover:border-seam-bright hover:text-text-secondary lg:flex"
+              className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-[2px] border border-dashed border-seam px-2 py-1.5 text-[10px] text-text-muted transition-colors hover:border-seam-bright hover:text-text-secondary"
             >
               <IconPlus className="h-3 w-3" />
               เพิ่มหุ้น
@@ -286,7 +292,7 @@ export function WatchlistRail({ symbol }: { symbol: string }) {
         </div>
       )}
 
-      <div className="mt-auto hidden shrink-0 border-t border-seam/60 px-3 py-2 lg:block">
+      <div className="mt-auto shrink-0 border-t border-seam/60 px-3 py-2">
         <Link
           href="/watchlist"
           className="text-[10px] text-text-muted transition-colors hover:text-text-primary"
