@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SymbolSearchInput, type SymbolSearchResult } from "@/components/symbol-search-input";
+import { WatchlistPanel } from "@/components/watchlist-panel";
 import { IconWave } from "@/components/icons";
 
 export default function Home() {
@@ -14,8 +15,8 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3rem)] flex-col items-center justify-center px-4">
-      <div className="flex flex-col items-center gap-6">
+    <div className="flex min-h-[calc(100dvh-3rem)] flex-col items-center justify-center px-4 py-10">
+      <div className="flex w-full flex-col items-center gap-6">
         <IconWave className="h-10 w-10 text-ch-price" />
 
         <div className="flex flex-col items-center gap-1">
@@ -36,6 +37,8 @@ export default function Home() {
           className="w-full max-w-[640px] sm:max-w-[900px] focus:outline-none focus:ring-0 focus:border-seam-bright"
           inputClassName="telemetry w-full rounded border border-seam bg-panel-2 py-3 pl-10 pr-4 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-0 focus:border-seam-bright"
         />
+
+        <WatchlistPanel variant="preview" className="w-full max-w-[900px]" />
       </div>
     </div>
   );

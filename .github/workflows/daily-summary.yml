@@ -22,10 +22,29 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          # Retries cover transient failures (cold start, upstream data provider hiccup);
-          # the endpoint itself takes well under the 300s cap.
-          curl --fail-with-body \
+          : "${APP_BASE_URL:?APP_BASE_URL secret is not set}"
+          : "${CRON_SECRET:?CRON_SECRET secret is not set}"
+
+          # Do not follow redirects. Vercel Deployment Protection answers
+          # unauthenticated requests with a 302 to its SSO page, and curl
+          # treats 3xx as success. Check the status explicitly instead.
+          response="$(mktemp)"
+          trap 'rm -f "$response"' EXIT
+
+          if ! status="$(curl -sS -o "$response" -w '%{http_code}' \
                --retry 3 --retry-delay 30 --retry-all-errors \
                --max-time 300 \
                -X POST "${APP_BASE_URL%/}/api/daily-summary" \
-               -H "Authorization: Bearer ${CRON_SECRET}"
+               -H "Authorization: Bearer ${CRON_SECRET}")"; then
+            echo "Request failed before receiving an HTTP response"
+            cat "$response" || true
+            exit 1
+          fi
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Request failed with HTTP ${status}"
+            cat "$response" || true
+            exit 1
+          fi
+
+          cat "$response"

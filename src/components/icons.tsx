@@ -116,3 +116,11 @@ export function IconSearch({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconStar({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="m12 3.5 2.7 5.5 6 .9-4.4 4.2 1 6-5.3-2.8-5.3 2.8 1-6L3.3 9.9l6-.9L12 3.5Z" />
+    </svg>
+  );
+}

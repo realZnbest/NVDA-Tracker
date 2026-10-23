@@ -2,13 +2,18 @@ import { NextResponse } from "next/server";
 import { getQuote, FinnhubError } from "@/lib/finnhub";
 import { getYahooCandles } from "@/lib/yahoo";
 import { evaluateAlerts, type SymbolMarketSnapshot } from "@/lib/evaluate-alerts";
-import { requireAlertsAuth } from "@/lib/alerts-auth";
+import { requireOwnerOrCron } from "@/lib/alerts-auth";
 import { listAlerts } from "@/lib/alerts-store";
 import { listLots } from "@/lib/position-store";
 import { computeAggregatePositionsBySymbol } from "@/lib/position";
 
+export const maxDuration = 60;
+
 export async function POST() {
-  const unauth = await requireAlertsAuth();
+  // The owner's open tab can call this via the signed cookie; a scheduled job calls it
+  // with `Authorization: Bearer $CRON_SECRET` instead, so alerts keep evaluating even when
+  // no browser tab is open.
+  const unauth = await requireOwnerOrCron();
   if (unauth) return unauth;
   try {
     const [allAlerts, lots] = await Promise.all([listAlerts(), listLots()]);

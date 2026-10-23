@@ -39,6 +39,35 @@ export interface AlertNotification {
   readAt: number | null;
 }
 
+export const MAX_WATCHLIST_ITEMS = 30;
+/** Tickers can contain dots (BRK.B), dashes (BTC-USD), index carets (^GSPC) and
+ *  vendor suffixes (EURUSD=X); keep the shape tight so arbitrary strings never reach
+ *  Turso or a provider URL. */
+export const WATCHLIST_SYMBOL_PATTERN = /^[A-Z0-9^][A-Z0-9.^=-]{0,19}$/;
+
+/** A symbol the owner follows, but does not necessarily hold. Kept separate from
+ *  position lots so "interested in" and "own" stay independent concepts. */
+export interface WatchlistItem {
+  symbol: string;
+  name: string;
+  sortOrder: number;
+  createdAt: number;
+}
+
+/** Trimmed quote shape for the watchlist table — a subset of FinnhubQuote so the
+ *  client doesn't need to know about provider-specific fields. */
+export interface WatchlistQuote {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  open: number;
+  high: number;
+  low: number;
+  previousClose: number;
+  time: number;
+}
+
 export const ALERT_TYPE_LABEL_TH: Record<AlertType, string> = {
   price_above: "ราคาสูงกว่า",
   price_below: "ราคาต่ำกว่า",

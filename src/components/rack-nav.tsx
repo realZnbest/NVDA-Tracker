@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
-import { IconBell, IconLedger, IconSignal, IconWallet, IconWave } from "./icons";
+import { IconBell, IconLedger, IconSignal, IconStar, IconWallet, IconWave } from "./icons";
 import { NotificationBell } from "./notification-bell";
 import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 
@@ -12,6 +12,7 @@ import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-inpu
 // instead of always bouncing back to the bare (NVDA) route.
 const NAV_ITEMS = [
   { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave, symbolAware: true },
+  { href: "/watchlist", label: "รายการติดตาม", icon: IconStar, symbolAware: false },
   { href: "/financials", label: "งบการเงิน", icon: IconLedger, symbolAware: true },
   { href: "/news", label: "ข่าว", icon: IconSignal, symbolAware: true },
   { href: "/portfolio", label: "พอร์ตของฉัน", icon: IconWallet, symbolAware: false },

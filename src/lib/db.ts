@@ -3,7 +3,13 @@ import { createClient, type Client } from "@libsql/client";
 declare global {
   var __nvdaTurso: Client | undefined;
   var __nvdaTursoInitialized: boolean | undefined;
+  var __nvdaTursoSchemaVersion: number | undefined;
+  var __nvdaTursoInitPromise: Promise<void> | undefined;
 }
+
+/** Bump when adding a table/column so a long-lived dev process re-runs the idempotent
+ *  schema setup after hot reload instead of assuming its old globals are still current. */
+const SCHEMA_VERSION = 1;
 
 /**
  * libSQL has no `ADD COLUMN IF NOT EXISTS` — check `PRAGMA table_info` first so re-running
@@ -38,13 +44,32 @@ function createTursoClient(): Client {
  * missing env vars even on a machine that never actually serves a request. Tables are
  * created here too (idempotent `CREATE TABLE IF NOT EXISTS`) so there's no separate
  * manual migration step — unlike a hosted Postgres, a fresh Turso database starts empty.
+ *
+ * Initialization is guarded by a shared promise: the first alert check calls listAlerts()
+ * and listLots() concurrently, and without this both would run the CREATE/ALTER sequence
+ * at once on a cold process and one of them would fail.
  */
 export async function getDb(): Promise<Client> {
-  if (!globalThis.__nvdaTurso) {
-    globalThis.__nvdaTurso = createTursoClient();
+  const db =
+    globalThis.__nvdaTurso ??
+    (globalThis.__nvdaTurso = createTursoClient());
+
+  if (
+    !globalThis.__nvdaTursoInitialized ||
+    globalThis.__nvdaTursoSchemaVersion !== SCHEMA_VERSION
+  ) {
+    if (!globalThis.__nvdaTursoInitPromise) {
+      globalThis.__nvdaTursoInitPromise = initializeDatabase(db).finally(() => {
+        globalThis.__nvdaTursoInitPromise = undefined;
+      });
+    }
+    await globalThis.__nvdaTursoInitPromise;
   }
-  if (!globalThis.__nvdaTursoInitialized) {
-    await globalThis.__nvdaTurso.execute(`
+  return db;
+}
+
+async function initializeDatabase(db: Client): Promise<void> {
+  await db.execute(`
       CREATE TABLE IF NOT EXISTS alerts (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
@@ -57,7 +82,7 @@ export async function getDb(): Promise<Client> {
         lastTriggeredAt INTEGER
       )
     `);
-    await globalThis.__nvdaTurso.execute(`
+  await db.execute(`
       CREATE TABLE IF NOT EXISTS notifications (
         id TEXT PRIMARY KEY,
         alertId TEXT NOT NULL,
@@ -66,7 +91,15 @@ export async function getDb(): Promise<Client> {
         readAt INTEGER
       )
     `);
-    await globalThis.__nvdaTurso.execute(`
+  await db.execute(`
+      CREATE TABLE IF NOT EXISTS watchlist_items (
+        symbol TEXT PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT '',
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        createdAt INTEGER NOT NULL
+      )
+    `);
+  await db.execute(`
       CREATE TABLE IF NOT EXISTS position_lots (
         id TEXT PRIMARY KEY,
         purchaseDate INTEGER NOT NULL,
@@ -75,13 +108,14 @@ export async function getDb(): Promise<Client> {
         createdAt INTEGER NOT NULL
       )
     `);
-    await addColumnIfMissing(globalThis.__nvdaTurso, "position_lots", "symbol", "TEXT NOT NULL DEFAULT 'NVDA'");
-    await addColumnIfMissing(globalThis.__nvdaTurso, "alerts", "symbol", "TEXT");
-    // Backfill pre-migration alerts: everything used to implicitly mean NVDA, including
-    // pnl_percent_* — those become portfolio-wide only when the owner explicitly creates
-    // a new portfolio_pnl_percent_* alert, so existing rows keep their old (NVDA) meaning.
-    await globalThis.__nvdaTurso.execute(`UPDATE alerts SET symbol = 'NVDA' WHERE symbol IS NULL AND type != 'portfolio_pnl_percent_above' AND type != 'portfolio_pnl_percent_below'`);
-    globalThis.__nvdaTursoInitialized = true;
-  }
-  return globalThis.__nvdaTurso;
+  await addColumnIfMissing(db, "position_lots", "symbol", "TEXT NOT NULL DEFAULT 'NVDA'");
+  await addColumnIfMissing(db, "alerts", "symbol", "TEXT");
+  // Backfill pre-migration alerts: everything used to implicitly mean NVDA, including
+  // pnl_percent_* — those become portfolio-wide only when the owner explicitly creates
+  // a new portfolio_pnl_percent_* alert, so existing rows keep their old (NVDA) meaning.
+  await db.execute(
+    `UPDATE alerts SET symbol = 'NVDA' WHERE symbol IS NULL AND type != 'portfolio_pnl_percent_above' AND type != 'portfolio_pnl_percent_below'`
+  );
+  globalThis.__nvdaTursoSchemaVersion = SCHEMA_VERSION;
+  globalThis.__nvdaTursoInitialized = true;
 }
