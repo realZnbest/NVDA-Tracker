@@ -105,12 +105,12 @@ const TARGET_1H_BAR_SPACING = 9;
 const RESPONSIVE_1H_CAP_DAYS = 28;
 
 /**
- * The 1H tab's 20-day desktop window would squeeze ~100 candles into a phone-width
- * chart. Compact viewports start at 5 days; the width-aware target below can still add
- * bars up to the 9px spacing target, so tablets get more context without fat candles.
- * This only affects the price chart; the analysis/compare views keep their fixed scope.
+ * The mobile dashboard opens the 1H chart on a fixed 67-bar window. That is enough
+ * context for the phone without squeezing the candles into a phone-width slice of the
+ * desktop's 20-day scope. This only affects the price chart; analysis/compare keep
+ * their fixed scope.
  */
-const COMPACT_1H_SCOPE_DAYS = 5;
+const COMPACT_1H_VISIBLE_BARS = 67;
 
 /** The dashboard switches to the full-height mobile app shell below Tailwind's `lg` (64rem). */
 function isCompactChartViewport(): boolean {
@@ -124,7 +124,7 @@ function isCompactChartViewport(): boolean {
  * How many bars the default view should show for a timeframe. Range tabs keep their
  * semantic window (1D is one day, 1M is one month); the interval-based 1H tab widens
  * its window on large charts until bars sit near TARGET_1H_BAR_SPACING apart, capped
- * just under the 1M scope. Compact viewports start from a shorter 1H window.
+ * just under the 1M scope. Compact viewports use a fixed 67-bar 1H window.
  */
 function defaultVisibleBars(
   times: number[],
@@ -133,6 +133,9 @@ function defaultVisibleBars(
   compact: boolean
 ): number {
   if (times.length === 0) return 0;
+  if (timeframe === "1H" && compact) {
+    return Math.min(COMPACT_1H_VISIBLE_BARS, times.length);
+  }
   const tf = TIMEFRAMES.find((t) => t.key === timeframe);
   const lastTime = times[times.length - 1];
   let fromTime: number;
@@ -140,9 +143,7 @@ function defaultVisibleBars(
     const lastDate = new Date(lastTime * 1000);
     fromTime = Date.UTC(lastDate.getUTCFullYear(), 0, 1) / 1000;
   } else if (tf) {
-    const scopeDays =
-      timeframe === "1H" && compact ? COMPACT_1H_SCOPE_DAYS : tf.scopeDays;
-    fromTime = lastTime - scopeDays * 24 * 60 * 60;
+    fromTime = lastTime - tf.scopeDays * 24 * 60 * 60;
   } else {
     fromTime = times[0];
   }
@@ -391,16 +392,16 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
       macdHist: macdHistSeries,
     };
 
-    // On phones the chart is full-height but the four panes still share one canvas;
-    // give the candles a larger slice than the desktop cockpit so the price action
-    // remains the hero while volume/RSI/MACD stay readable subordinate strips.
+    // On phones the price pane stays the hero, but the volume/RSI/MACD strips need
+    // more height than the desktop cockpit gives them; rebalance the shared canvas so
+    // the oscillators are readable without sacrificing the candles.
     const applyPaneFactors = () => {
       const compact = isCompactChartViewport();
       const panes = chart.panes();
-      panes[0]?.setStretchFactor(compact ? 8 : 7);
-      panes[1]?.setStretchFactor(compact ? 0.8 : 0.9);
-      if (panes[2]) panes[2].setStretchFactor(compact ? 0.95 : 1.05);
-      if (panes[3]) panes[3].setStretchFactor(compact ? 0.95 : 1.05);
+      panes[0]?.setStretchFactor(compact ? 6 : 7);
+      panes[1]?.setStretchFactor(compact ? 1.2 : 0.9);
+      if (panes[2]) panes[2].setStretchFactor(compact ? 1.4 : 1.05);
+      if (panes[3]) panes[3].setStretchFactor(compact ? 1.4 : 1.05);
     };
     applyPaneFactors();
     const paneObserver = new ResizeObserver(applyPaneFactors);
@@ -571,20 +572,22 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
     if (scopedRef.current === timeframe) return;
     scopedRef.current = timeframe;
 
+    const compact = isCompactChartViewport();
     const targetBars = defaultVisibleBars(
       times,
       timeframe,
       chartRef.current.timeScale().width(),
-      isCompactChartViewport()
+      compact
     );
 
-    // Keep a small breathing room at both edges so the first/last time labels are not
-    // sliced in half by the canvas boundary. Two bars of padding also keeps the newest
-    // candle from sitting flush against the price scale.
+    // Keep breathing room at both edges so the first/last time labels are not sliced
+    // in half by the canvas boundary. The phone 1H view uses half a bar at each edge
+    // so the user sees exactly 67 fully drawn candles; other views keep two bars.
+    const edgePadding = compact && timeframe === "1H" ? 0.5 : 2;
     const visibleStart = Math.max(0, times.length - targetBars);
     chartRef.current.timeScale().setVisibleLogicalRange({
-      from: Math.max(0, visibleStart - 2),
-      to: times.length - 1 + 2,
+      from: Math.max(0, visibleStart - edgePadding),
+      to: times.length - 1 + edgePadding,
     });
   }, [candles, candlesTimeframe, timeframe]);
 

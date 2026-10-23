@@ -11,7 +11,7 @@ import { AnalystPanel } from "@/components/analyst-panel";
 import { EarningsCountdown } from "@/components/earnings-countdown";
 import { BenchmarkChart } from "@/components/benchmark-chart";
 import { ChatWidget } from "@/components/chat-widget";
-import { IconSliders, IconSpark, IconStar, IconWave } from "@/components/icons";
+import { IconSliders, IconSpark, IconWave } from "@/components/icons";
 
 // NVDA keeps its original flat storage key so an existing owner's saved timeframe
 // carries over unchanged; every other symbol gets its own key so tab selection
@@ -22,7 +22,7 @@ function timeframeStorageKey(symbol: string): string {
 
 type ChartView = "price" | "compare";
 type InspectorTab = "analysis" | "street" | "events";
-type MobileTab = "chart" | "analysis" | "watchlist";
+type MobileTab = "chart" | "analysis";
 
 const INSPECTOR_TABS: { key: InspectorTab; label: string }[] = [
   { key: "analysis", label: "วิเคราะห์" },
@@ -33,7 +33,6 @@ const INSPECTOR_TABS: { key: InspectorTab; label: string }[] = [
 const MOBILE_TABS: { key: MobileTab; label: string; icon: typeof IconWave }[] = [
   { key: "chart", label: "กราฟ", icon: IconWave },
   { key: "analysis", label: "วิเคราะห์", icon: IconSliders },
-  { key: "watchlist", label: "รายการ", icon: IconStar },
 ];
 
 export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
@@ -69,7 +68,7 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
       <div className="grid min-h-0 grid-cols-1 gap-3 max-lg:flex max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col max-lg:gap-0 lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-4 xl:min-h-0 xl:flex-1 xl:gap-3 xl:grid-cols-[180px_minmax(0,1fr)_290px]">
         <WatchlistRail
           symbol={symbol}
-          className={`${mobileTab === "watchlist" ? "flex" : "hidden"} max-lg:flex-1 lg:flex`}
+          className="hidden lg:flex"
         />
 
         <section
@@ -227,7 +226,7 @@ function MobileTabBar({
       className="shrink-0 border-t border-seam bg-bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       aria-label="แท็บแดชบอร์ด"
     >
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-3">
         {MOBILE_TABS.map((tab) => {
           const Icon = tab.icon;
           const selected = active === tab.key;
