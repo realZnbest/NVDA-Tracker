@@ -103,9 +103,9 @@ function Sparkline({
   const gradientId = useId().replace(/:/g, "");
   const width = 96;
   const height = 40;
-  // Compact rows keep the sparkline inline at ~96px; phones give it the full row width
-  // instead of squeezing it into a 48px square between the symbol and the price.
-  const sizeClass = `h-9 w-12 shrink-0 overflow-visible sm:h-10 sm:w-24 ${className}`;
+  // Keep the desktop sparkline inline in the row on every screen size. Phones have
+  // enough width for the full 96px chart once the row uses the same 3-column grid.
+  const sizeClass = `h-10 w-24 shrink-0 overflow-visible ${className}`;
 
   if (points.length < 2) {
     return <div className={sizeClass} aria-hidden="true" />;
@@ -505,7 +505,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                   >
                     <Link
                       href={`/dashboard/${encodeURIComponent(item.symbol)}`}
-                      className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 px-4 py-3 transition-colors hover:bg-white/[0.02] sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-3 sm:px-5 sm:py-3.5"
+                      className="group grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-1.5 px-4 py-3 transition-colors hover:bg-white/[0.02] sm:gap-3 sm:px-5 sm:py-3.5"
                     >
                       <div className="min-w-0">
                         <div className="mb-1 flex min-h-4 items-center">
@@ -521,7 +521,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                             <p className="telemetry truncate text-[0.9375rem] font-semibold leading-tight text-text-primary sm:text-base">
                               {item.symbol}
                             </p>
-                            <p className="hidden truncate text-[0.625rem] text-text-muted sm:block">
+                            <p className="truncate text-[0.625rem] leading-tight text-text-muted">
                               {item.name || "—"}
                             </p>
                           </div>
@@ -531,12 +531,11 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                       <Sparkline
                         points={snapshot?.sparkline ?? []}
                         color={color}
-                        className="max-sm:col-span-2 max-sm:row-start-2 max-sm:-mx-4 max-sm:mt-0.5 max-sm:h-14 max-sm:w-[calc(100%+2rem)]"
                       />
 
-                      <div className="min-w-0 pl-2 text-right max-sm:col-start-2 max-sm:row-start-1 sm:pl-3">
+                      <div className="min-w-0 text-right sm:pl-3">
                         {extended && (
-                          <p className="mb-0.5 hidden whitespace-nowrap text-[0.625rem] text-text-muted min-[390px]:block">
+                          <p className="mb-0.5 hidden whitespace-nowrap text-[0.5625rem] text-text-muted min-[390px]:block sm:text-[0.625rem]">
                             {extendedLabel}{" "}
                             <span className="telemetry text-text-secondary">
                               {priceText(extended.price)}
