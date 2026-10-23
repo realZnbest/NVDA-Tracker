@@ -15,30 +15,35 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3rem)] flex-col items-center justify-center px-2 py-10 sm:px-4">
+    <div className="flex min-h-[calc(100dvh-3rem)] flex-col items-center justify-center py-10">
       <div className="flex w-full max-w-[500px] flex-col items-center gap-6">
-        <IconWave className="h-10 w-10 text-ch-price" />
+        <div className="flex w-full flex-col items-center gap-6 px-4 sm:px-0">
+          <IconWave className="h-10 w-10 text-ch-price" />
 
-        <div className="flex flex-col items-center gap-1">
-          <h1 className="text-display-headline font-medium text-text-primary tracking-tight">
-            Stock Tracker
-          </h1>
-          <p className="text-sm text-text-muted">
-            ค้นหาหุ้นตัวไหนก็ได้เพื่อดูข้อมูล
-          </p>
+          <div className="flex flex-col items-center gap-1">
+            <h1 className="text-display-headline font-medium text-text-primary tracking-tight">
+              Stock Tracker
+            </h1>
+            <p className="text-sm text-text-muted">
+              ค้นหาหุ้นตัวไหนก็ได้เพื่อดูข้อมูล
+            </p>
+          </div>
+
+          <SymbolSearchInput
+            value={query}
+            onChange={setQuery}
+            onSelect={handleSelect}
+            placeholder="ค้นหาหุ้น เช่น NVDA, AAPL"
+            autoFocus
+            className="w-full max-w-[320px] sm:max-w-none focus:outline-none focus:ring-0 focus:border-seam-bright"
+            inputClassName="telemetry w-full rounded border border-seam bg-panel-2 py-3 pl-10 pr-4 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-0 focus:border-seam-bright"
+          />
         </div>
 
-        <SymbolSearchInput
-          value={query}
-          onChange={setQuery}
-          onSelect={handleSelect}
-          placeholder="ค้นหาหุ้น เช่น NVDA, AAPL"
-          autoFocus
-          className="w-full focus:outline-none focus:ring-0 focus:border-seam-bright"
-          inputClassName="telemetry w-full rounded border border-seam bg-panel-2 py-3 pl-10 pr-4 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-0 focus:border-seam-bright"
+        <WatchlistPanel
+          variant="preview"
+          className="w-full max-[500px]:rounded-none max-[500px]:border-x-0 max-[500px]:shadow-none max-[500px]:[&::before]:hidden max-[500px]:[&::after]:hidden"
         />
-
-        <WatchlistPanel variant="preview" className="w-full" />
       </div>
     </div>
   );

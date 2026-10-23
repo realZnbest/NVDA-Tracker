@@ -4,19 +4,58 @@ import WebSocket from "ws";
  * Finnhub's free-tier REST `/quote` snapshot lags real trades by 20-30s — it refreshes
  * on its own internal cadence, not on every print. The trade websocket pushes each
  * print as it happens, so a single shared connection here (one per server process,
- * fine for a single-user tool) lets `/api/quote` hand back a price that's actually
+ * fine for a single-user tool) lets the quote routes hand back a price that's actually
  * fresher than what the REST call alone would give, without spending extra REST quota.
+ *
+ * State lives on `globalThis` rather than in module scope because Next bundles each
+ * route separately: importing this file from both `/api/quote` and
+ * `/api/watchlist/quotes` otherwise evaluates it twice and opens two sockets. Finnhub's
+ * free plan allows one websocket connection, so the second one is rejected with 429.
+ * A process-wide singleton also survives dev hot reloads, which would otherwise leak a
+ * connection on every edit.
  */
 
 type Tick = { price: number; time: number };
 
-const ticks = new Map<string, Tick>();
-const subscribed = new Set<string>();
-const waiters = new Map<string, Set<(tick: Tick) => void>>();
-let socket: WebSocket | null = null;
-let connecting = false;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let lastActivity = Date.now();
+interface WsState {
+  ticks: Map<string, Tick>;
+  subscribed: Set<string>;
+  /** Last time each subscribed symbol was requested by a UI poll, used for LRU eviction. */
+  lastTouched: Map<string, number>;
+  waiters: Map<string, Set<(tick: Tick) => void>>;
+  socket: WebSocket | null;
+  connecting: boolean;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  watchdog: ReturnType<typeof setInterval> | null;
+  lastActivity: number;
+}
+
+/**
+ * Finnhub's free plan streams at most 50 symbols on one connection. Watchlist and
+ * dashboard symbols accumulate as the owner browses; keep a little headroom and evict
+ * the least recently requested symbol so the newest view is never the one that gets
+ * dropped.
+ */
+const MAX_STREAMED_SYMBOLS = 45;
+
+const globalForWs = globalThis as typeof globalThis & { __finnhubWs?: WsState };
+
+function state(): WsState {
+  if (!globalForWs.__finnhubWs) {
+    globalForWs.__finnhubWs = {
+      ticks: new Map(),
+      subscribed: new Set(),
+      lastTouched: new Map(),
+      waiters: new Map(),
+      socket: null,
+      connecting: false,
+      reconnectTimer: null,
+      watchdog: null,
+      lastActivity: Date.now(),
+    };
+  }
+  return globalForWs.__finnhubWs;
+}
 
 /**
  * Idle TCP connections behind NATs/load balancers can die without ever firing `close`
@@ -27,17 +66,28 @@ let lastActivity = Date.now();
  * reconnect path picks it back up.
  */
 const STALE_AFTER_MS = 45_000;
-setInterval(() => {
-  if (socket && Date.now() - lastActivity > STALE_AFTER_MS) {
-    console.warn("[finnhub-ws] no messages in", STALE_AFTER_MS, "ms — terminating stale connection");
-    socket.terminate();
-  }
-}, 15_000).unref();
+
+function ensureWatchdog() {
+  const s = state();
+  if (s.watchdog) return;
+  s.watchdog = setInterval(() => {
+    if (s.socket && Date.now() - s.lastActivity > STALE_AFTER_MS) {
+      console.warn(
+        "[finnhub-ws] no messages in",
+        STALE_AFTER_MS,
+        "ms — terminating stale connection"
+      );
+      s.socket.terminate();
+    }
+  }, 15_000);
+  s.watchdog.unref();
+}
 
 function notifyWaiters(symbol: string, tick: Tick) {
-  const set = waiters.get(symbol);
+  const s = state();
+  const set = s.waiters.get(symbol);
   if (!set) return;
-  waiters.delete(symbol);
+  s.waiters.delete(symbol);
   for (const resolve of set) resolve(tick);
 }
 
@@ -46,36 +96,38 @@ function primaryKey(): string | undefined {
 }
 
 function scheduleReconnect() {
-  if (reconnectTimer) return;
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
+  const s = state();
+  if (s.reconnectTimer) return;
+  s.reconnectTimer = setTimeout(() => {
+    s.reconnectTimer = null;
     connect();
   }, 3_000);
 }
 
 function connect() {
-  if (socket || connecting) return;
+  const s = state();
+  if (s.socket || s.connecting) return;
   const key = primaryKey();
   if (!key) return;
 
-  connecting = true;
+  s.connecting = true;
   const ws = new WebSocket(`wss://ws.finnhub.io?token=${key}`);
 
   ws.on("open", () => {
-    connecting = false;
-    socket = ws;
-    lastActivity = Date.now();
-    for (const symbol of subscribed) {
+    s.connecting = false;
+    s.socket = ws;
+    s.lastActivity = Date.now();
+    for (const symbol of s.subscribed) {
       ws.send(JSON.stringify({ type: "subscribe", symbol }));
     }
   });
 
   ws.on("ping", () => {
-    lastActivity = Date.now();
+    s.lastActivity = Date.now();
   });
 
   ws.on("message", (raw) => {
-    lastActivity = Date.now();
+    s.lastActivity = Date.now();
     let msg: { type?: string; data?: Array<{ s: string; p: number; t: number }> };
     try {
       msg = JSON.parse(raw.toString());
@@ -84,10 +136,10 @@ function connect() {
     }
     if (msg.type !== "trade" || !Array.isArray(msg.data)) return;
     for (const trade of msg.data) {
-      const prev = ticks.get(trade.s);
+      const prev = s.ticks.get(trade.s);
       if (!prev || trade.t > prev.time) {
         const tick = { price: trade.p, time: trade.t };
-        ticks.set(trade.s, tick);
+        s.ticks.set(trade.s, tick);
         notifyWaiters(trade.s, tick);
       }
     }
@@ -95,27 +147,65 @@ function connect() {
 
   const onDown = (reason: string) => {
     console.warn(`[finnhub-ws] connection down (${reason}), reconnecting in 3s`);
-    connecting = false;
-    socket = null;
+    s.connecting = false;
+    s.socket = null;
     scheduleReconnect();
   };
   ws.on("close", (code) => onDown(`close ${code}`));
   ws.on("error", (err) => onDown(`error ${err.message}`));
 }
 
-/** Idempotent — safe to call on every request for a symbol the dashboard is showing. */
-export function subscribeSymbol(symbol: string) {
-  if (subscribed.has(symbol)) return;
-  subscribed.add(symbol);
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "subscribe", symbol }));
+function dropSubscription(symbol: string) {
+  const s = state();
+  s.subscribed.delete(symbol);
+  s.lastTouched.delete(symbol);
+  s.ticks.delete(symbol);
+  if (s.socket && s.socket.readyState === WebSocket.OPEN) {
+    try {
+      s.socket.send(JSON.stringify({ type: "unsubscribe", symbol }));
+    } catch {
+      // The reconnect path re-subscribes the remaining set; a send race is harmless.
+    }
   }
+}
+
+/** Idempotent — safe to call on every request for a symbol the UI is showing. Also
+ *  refreshes the connection intent after a hot reload, where the socket may be gone. */
+export function subscribeSymbol(symbol: string) {
+  const s = state();
+  ensureWatchdog();
+  const isNew = !s.subscribed.has(symbol);
+  s.subscribed.add(symbol);
+  s.lastTouched.set(symbol, Date.now());
+  if (isNew && s.socket && s.socket.readyState === WebSocket.OPEN) {
+    try {
+      s.socket.send(JSON.stringify({ type: "subscribe", symbol }));
+    } catch {
+      // The reconnect path re-subscribes `s.subscribed`; don't fail the quote route.
+    }
+  }
+
+  while (s.subscribed.size > MAX_STREAMED_SYMBOLS) {
+    let oldest: string | null = null;
+    let oldestAt = Infinity;
+    for (const candidate of s.subscribed) {
+      if (candidate === symbol) continue;
+      const touchedAt = s.lastTouched.get(candidate) ?? 0;
+      if (touchedAt < oldestAt) {
+        oldestAt = touchedAt;
+        oldest = candidate;
+      }
+    }
+    if (!oldest) break;
+    dropSubscription(oldest);
+  }
+
   connect();
 }
 
 /** Most recent trade print for `symbol`, or null if none has arrived yet this process. */
 export function getLiveTick(symbol: string): Tick | null {
-  return ticks.get(symbol) ?? null;
+  return state().ticks.get(symbol) ?? null;
 }
 
 /**
@@ -126,7 +216,8 @@ export function getLiveTick(symbol: string): Tick | null {
  * Every request after that already has a cached tick and returns immediately.
  */
 export function waitForLiveTick(symbol: string, timeoutMs: number): Promise<Tick | null> {
-  const existing = ticks.get(symbol);
+  const s = state();
+  const existing = s.ticks.get(symbol);
   if (existing) return Promise.resolve(existing);
 
   return new Promise((resolve) => {
@@ -134,13 +225,13 @@ export function waitForLiveTick(symbol: string, timeoutMs: number): Promise<Tick
       clearTimeout(timer);
       resolve(tick);
     };
-    const set = waiters.get(symbol) ?? new Set();
+    const set = s.waiters.get(symbol) ?? new Set();
     set.add(onTick);
-    waiters.set(symbol, set);
+    s.waiters.set(symbol, set);
 
     const timer = setTimeout(() => {
-      waiters.get(symbol)?.delete(onTick);
-      resolve(ticks.get(symbol) ?? null);
+      s.waiters.get(symbol)?.delete(onTick);
+      resolve(s.ticks.get(symbol) ?? null);
     }, timeoutMs);
   });
 }

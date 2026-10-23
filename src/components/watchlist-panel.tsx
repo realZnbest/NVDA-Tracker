@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
   MAX_WATCHLIST_ITEMS,
@@ -22,8 +22,41 @@ import {
 } from "./icons";
 
 const PREVIEW_LIMIT = 6;
-const QUOTE_REFRESH_MS = 60_000;
+/** The server overlays live websocket prints, so polling the app every 5s is nearly free
+ *  in provider quota. Outside trading hours nothing moves; drop back to 60s. */
+const QUOTE_REFRESH_LIVE_MS = 5_000;
+const QUOTE_REFRESH_IDLE_MS = 60_000;
 const MARKET_REFRESH_MS = 5 * 60_000;
+
+const SESSION_BADGE: Record<
+  WatchlistMarket["session"],
+  { label: string; color: string; pulse: boolean; title: string }
+> = {
+  regular: {
+    label: "LIVE",
+    color: "var(--up)",
+    pulse: true,
+    title: "ตลาดเปิด — ราคาอัปเดตทุก 5 วินาทีเมื่อสตรีมพร้อม",
+  },
+  pre: {
+    label: "PRE",
+    color: "#e3a94b",
+    pulse: false,
+    title: "ก่อนตลาดเปิด — ราคาอัปเดตทุก 5 วินาทีเมื่อสตรีมพร้อม",
+  },
+  post: {
+    label: "AH",
+    color: "#e3a94b",
+    pulse: false,
+    title: "หลังตลาดปิด — ราคาอัปเดตทุก 5 วินาทีเมื่อสตรีมพร้อม",
+  },
+  closed: {
+    label: "CLOSED",
+    color: "var(--text-muted)",
+    pulse: false,
+    title: "ตลาดปิด — ราคาอัปเดตทุก 60 วินาที",
+  },
+};
 
 interface WatchlistPanelProps {
   variant?: "full" | "preview";
@@ -39,6 +72,34 @@ function priceText(value: number): string {
 
 function pctText(value: number): string {
   return `${Math.abs(value).toFixed(2)}%`;
+}
+
+/**
+ * A price that briefly tints green/red when the websocket print changes it, so a live
+ * row reads as alive without animating every row on every poll (unchanged values never
+ * flash). The tint fades out via transition-colors once the flash state clears.
+ */
+function LivePrice({ value }: { value: number }) {
+  const previous = useRef(value);
+  const [flash, setFlash] = useState<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    if (value === previous.current) return;
+    setFlash(value > previous.current ? "up" : "down");
+    previous.current = value;
+    const timer = setTimeout(() => setFlash(null), 700);
+    return () => clearTimeout(timer);
+  }, [value]);
+
+  return (
+    <span
+      className={`-mx-1 rounded-sm px-1 transition-colors duration-700 ${
+        flash === "up" ? "bg-up/20" : flash === "down" ? "bg-down/20" : "bg-transparent"
+      }`}
+    >
+      {priceText(value)}
+    </span>
+  );
 }
 
 function quoteColor(quote: WatchlistQuote | undefined): string {
@@ -70,7 +131,7 @@ function StockLogo({ symbol }: { symbol: string }) {
   const monogram = symbol.replace(/^\^/, "").slice(0, 1);
 
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-panel-2 ring-1 ring-white/10 sm:h-9 sm:w-9">
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-panel-2 ring-1 ring-white/10 sm:h-9 sm:w-9">
       {failed ? (
         <span className="telemetry text-[0.625rem] font-semibold text-text-secondary">
           {monogram}
@@ -83,7 +144,7 @@ function StockLogo({ symbol }: { symbol: string }) {
           src={`https://assets.parqet.com/logos/symbol/${encodeURIComponent(symbol)}?format=png`}
           alt=""
           loading="lazy"
-          className="h-full w-full rounded-full object-cover"
+          className="h-full w-full rounded-md object-cover"
           onError={() => setFailed(true)}
         />
       )}
@@ -161,6 +222,8 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [asOf, setAsOf] = useState<number | null>(null);
+  /** True only when the server confirms this process is receiving websocket prints. */
+  const [live, setLive] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   const [query, setQuery] = useState("");
@@ -190,6 +253,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
     if (items.length === 0) {
       setQuotes({});
       setQuoteErrors({});
+      setLive(false);
       return;
     }
     try {
@@ -197,16 +261,22 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
         `/api/watchlist/quotes${preview ? `?limit=${PREVIEW_LIMIT}` : ""}`,
         { cache: "no-store" }
       );
-      if (!res.ok) return;
+      if (!res.ok) {
+        setLive(false);
+        return;
+      }
       const data = (await res.json()) as {
         quotes?: Record<string, WatchlistQuote>;
         errors?: Record<string, string>;
         asOf?: number;
+        live?: boolean;
       };
       setQuotes(data.quotes ?? {});
       setQuoteErrors(data.errors ?? {});
       setAsOf(data.asOf ?? Date.now());
+      setLive(Boolean(data.live));
     } catch {
+      setLive(false);
       // Silent: keep the last good quote rather than blanking the whole table on a
       // transient provider/network hiccup.
     }
@@ -238,6 +308,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
       setQuotes({});
       setQuoteErrors({});
       setMarket({});
+      setLive(false);
       setLoading(authStatus === "checking");
       return;
     }
@@ -255,6 +326,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
       setQuotes({});
       setQuoteErrors({});
       setAsOf(null);
+      setLive(false);
       return;
     }
     void loadQuotes();
@@ -269,7 +341,24 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
     void loadMarket();
   }, [authStatus, items, loadMarket]);
 
-  usePoll(loadQuotes, QUOTE_REFRESH_MS, {
+  // One session for the whole list: if any followed instrument is trading, prices are
+  // moving somewhere on the page, so keep the fast cadence. The slow cadence only when
+  // every row is shut — there is nothing to animate then.
+  const sessions = Object.values(market).map((entry) => entry.session);
+  const session: WatchlistMarket["session"] | null =
+    sessions.length === 0
+      ? null
+      : sessions.includes("regular")
+        ? "regular"
+        : sessions.includes("pre")
+          ? "pre"
+          : sessions.includes("post")
+            ? "post"
+            : "closed";
+  const quoteRefreshMs =
+    session && session !== "closed" && live ? QUOTE_REFRESH_LIVE_MS : QUOTE_REFRESH_IDLE_MS;
+
+  usePoll(loadQuotes, quoteRefreshMs, {
     enabled: authStatus === "authenticated" && items.length > 0,
     leading: false,
   });
@@ -389,7 +478,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
             รายการติดตาม
           </h2>
           <span
-            title="หุ้นที่คุณติดตาม ราคาอัปเดตทุกนาที"
+            title="หุ้นที่คุณติดตาม ราคาอัปเดตทุก 5 วินาทีขณะตลาดเปิด (สำรองทุก 60 วินาที)"
             className="shrink-0 text-text-muted"
           >
             <IconInfo className="h-4 w-4" />
@@ -432,11 +521,34 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
       {!collapsed && (
         <>
           <div className="flex items-baseline justify-between gap-3 border-b border-seam px-4 pb-2.5 sm:px-5">
-            <span className="whitespace-nowrap text-[0.6875rem] text-text-muted">
-              {loading ? "…" : `${items.length} รายการ`}
-              {!preview && updatedLabel ? ` · ราคา ณ ${updatedLabel}` : ""}
+            <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[0.6875rem] text-text-muted">
+              {session && (
+                <span
+                  title={SESSION_BADGE[session].title}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[0.5625rem] font-semibold tracking-[0.08em]"
+                  style={{
+                    color: SESSION_BADGE[session].color,
+                    backgroundColor: `color-mix(in srgb, ${SESSION_BADGE[session].color} 14%, transparent)`,
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-1 w-1 rounded-full ${
+                      SESSION_BADGE[session].pulse
+                        ? "animate-[lit-pulse_2s_ease-in-out_infinite]"
+                        : ""
+                    }`}
+                    style={{ backgroundColor: SESSION_BADGE[session].color }}
+                  />
+                  {SESSION_BADGE[session].label}
+                </span>
+              )}
+              <span className="truncate">
+                {loading ? "…" : `${items.length} รายการ`}
+                {!preview && updatedLabel ? ` · อัปเดต ${updatedLabel}` : ""}
+              </span>
             </span>
-            <span className="whitespace-nowrap text-[0.6875rem] text-text-muted">
+            <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-text-muted">
               % เปลี่ยนแปลงจากวันก่อนหน้า
             </span>
           </div>
@@ -497,6 +609,14 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                 const extendedLabel = snapshot?.post ? "หลังตลาดปิด" : "ก่อนตลาดเปิด";
                 const color = quoteColor(quote);
                 const label = instrumentLabel(item.symbol);
+                // The extended-hours delta is measured against the live price shown in the
+                // row, not the previous close, so the two numbers on the row agree.
+                const extendedChange =
+                  extended && quote ? extended.price - quote.price : extended?.change ?? 0;
+                const extendedPercent =
+                  extended && quote && quote.price > 0
+                    ? (extendedChange / quote.price) * 100
+                    : extended?.changePercent ?? 0;
 
                 return (
                   <li
@@ -508,13 +628,6 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                       className="group grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-1.5 px-4 py-3 transition-colors hover:bg-white/[0.02] sm:gap-3 sm:px-5 sm:py-3.5"
                     >
                       <div className="min-w-0">
-                        <div className="mb-1 flex min-h-4 items-center">
-                          {label && (
-                            <span className="rounded-sm bg-ch-nasdaq-dim/70 px-1.5 py-0.5 text-[0.5625rem] font-medium text-ch-nasdaq">
-                              {label}
-                            </span>
-                          )}
-                        </div>
                         <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                           <StockLogo symbol={item.symbol} />
                           <div className="min-w-0">
@@ -543,20 +656,20 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                             <span
                               className="telemetry inline-flex items-center gap-0.5"
                               style={{
-                                color: extended.change >= 0 ? "var(--up)" : "var(--down)",
+                                color: extendedChange >= 0 ? "var(--up)" : "var(--down)",
                               }}
                             >
-                              {extended.change >= 0 ? (
+                              {extendedChange >= 0 ? (
                                 <IconArrowUp className="h-2.5 w-2.5" />
                               ) : (
                                 <IconArrowDown className="h-2.5 w-2.5" />
                               )}
-                              {pctText(extended.changePercent)}
+                              {pctText(extendedPercent)}
                             </span>
                           </p>
                         )}
                         <p className="telemetry whitespace-nowrap text-[0.9375rem] font-semibold leading-tight text-text-primary sm:text-lg">
-                          {quote ? priceText(quote.price) : "—"}
+                          {quote ? <LivePrice value={quote.price} /> : "—"}
                           {quote && label === "หุ้นสหรัฐฯ" && (
                             <span className="ml-1 text-[0.5625rem] font-normal text-text-muted sm:text-[0.625rem]">
                               USD

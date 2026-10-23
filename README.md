@@ -38,7 +38,7 @@ The break-even line on the price chart and the "ด้านพอร์ต" lin
 
 ### Watchlist
 
-`/watchlist` is a private list of symbols you want to follow without owning them — up to 30, added by picking a result from the same symbol search used everywhere else. It shows last price, change, % change and the day's open/high/low, refreshes every minute while the page is visible, and lets you reorder rows up/down so the list matches how you actually scan it. When you're signed in, the landing page shows a compact preview of the first six rows under the search box; the full page is one click away. Watchlist rows link straight to that symbol's dashboard.
+`/watchlist` is a private list of symbols you want to follow without owning them — up to 30, added by picking a result from the same symbol search used everywhere else. It shows last price, change, % change and the day's open/high/low, refreshes every 5 seconds while the market is open (every 60 seconds when everything is shut), and lets you reorder rows up/down so the list matches how you actually scan it. A shared Finnhub trade websocket drives the live price, so the faster refresh does not cost extra REST quota; rows briefly tint green/red when a new print moves them, and a LIVE/PRE/AH/CLOSED badge in the header shows the current session. When you're signed in, the landing page shows a compact preview of the first six rows under the search box; the full page is one click away. Watchlist rows link straight to that symbol's dashboard.
 
 ### Portfolio tracking
 

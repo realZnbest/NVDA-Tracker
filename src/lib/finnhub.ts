@@ -130,6 +130,21 @@ export function getQuote(symbol: string) {
   return fetchFinnhub<FinnhubQuote>("/quote", { symbol }, 2_500);
 }
 
+/**
+ * Last `/quote` snapshot already in memory, without a network round-trip. The watchlist
+ * routes poll several times a minute and overlay a live trade websocket print on top of
+ * this base, so they only need `pc`/`o`/`h`/`l` from REST — re-reading the cache keeps
+ * the displayed price live without spending a Finnhub call per poll.
+ *
+ * Expiry is deliberately ignored: callers decide when the snapshot is too old to be a
+ * useful base (see the throttling in /api/watchlist/quotes).
+ */
+export function peekQuote(symbol: string): FinnhubQuote | null {
+  const cacheKey = `/quote?${new URLSearchParams({ symbol }).toString()}`;
+  const hit = cache.get(cacheKey);
+  return hit ? (hit.data as FinnhubQuote) : null;
+}
+
 // Note: Finnhub's /stock/candle endpoint is restricted to paid plans.
 // Historical price candles come from Yahoo Finance instead — see lib/yahoo.ts.
 
