@@ -68,6 +68,16 @@ export interface WatchlistQuote {
   time: number;
 }
 
+/** Intraday sparkline plus the extended-hours print for one watchlist row. Fetched on a
+ *  slower cadence than quotes (see /api/watchlist/market) because the shape of the day
+ *  and the after-hours print don't need a per-minute refresh. */
+export interface WatchlistMarket {
+  session: "pre" | "regular" | "post" | "closed";
+  pre: { price: number; change: number; changePercent: number } | null;
+  post: { price: number; change: number; changePercent: number } | null;
+  sparkline: number[];
+}
+
 export const ALERT_TYPE_LABEL_TH: Record<AlertType, string> = {
   price_above: "ราคาสูงกว่า",
   price_below: "ราคาต่ำกว่า",

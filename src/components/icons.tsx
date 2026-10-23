@@ -124,3 +124,20 @@ export function IconStar({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconChevronDown({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+export function IconInfo({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5M12 7.8h.01" />
+    </svg>
+  );
+}

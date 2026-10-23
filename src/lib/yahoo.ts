@@ -1,4 +1,5 @@
 import type { FinnhubCandles } from "./finnhub";
+import type { WatchlistMarket } from "./types";
 
 interface YahooMeta {
   regularMarketPrice: number;
@@ -90,31 +91,23 @@ function lastCloseInWindow(
   return null;
 }
 
-export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHoursQuote> {
-  const hit = extendedCache.get(symbol);
-  if (hit && hit.expires > Date.now()) return hit.data;
+type ExtendedPrice = { price: number; change: number; changePercent: number };
 
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m&includePrePost=true`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
-  const data = (await res.json()) as YahooChartResponse;
-  const chartResult = data.chart.result?.[0];
-  const meta = chartResult?.meta;
-  if (!meta || !chartResult) throw new Error("YAHOO_NO_DATA");
-
+/** Shared pre/post derivation for the 1m header quote and the 5m watchlist snapshot, so
+ *  the two views can never disagree about what "after hours" means. */
+function deriveExtendedPrices(
+  meta: YahooMeta,
+  timestamps: number[],
+  closes: (number | null)[],
+  session: MarketSession
+): { pre: ExtendedPrice | null; post: ExtendedPrice | null } {
   const period = meta.currentTradingPeriod;
-  const timestamps = chartResult.timestamp;
-  const closes = chartResult.indicators.quote[0].close;
   const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? null;
   const regularPrice = meta.regularMarketPrice;
-  const session = computeSession(period);
   const now = Date.now() / 1000;
 
-  let pre: ExtendedHoursQuote["pre"] = null;
-  let post: ExtendedHoursQuote["post"] = null;
+  let pre: ExtendedPrice | null = null;
+  let post: ExtendedPrice | null = null;
 
   // Only surface the ONE slot that is chronologically still relevant right now — never
   // a stale pre-market print left over from a trading day whose regular session (and
@@ -154,19 +147,105 @@ export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHou
     }
   }
 
+  return { pre, post };
+}
+
+export async function getExtendedHoursQuote(symbol: string): Promise<ExtendedHoursQuote> {
+  const hit = extendedCache.get(symbol);
+  if (hit && hit.expires > Date.now()) return hit.data;
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m&includePrePost=true`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
+  const data = (await res.json()) as YahooChartResponse;
+  const chartResult = data.chart.result?.[0];
+  const meta = chartResult?.meta;
+  if (!meta || !chartResult) throw new Error("YAHOO_NO_DATA");
+
+  const session = computeSession(meta.currentTradingPeriod);
+  const timestamps = chartResult.timestamp;
+  const closes = chartResult.indicators.quote[0].close;
+  const { pre, post } = deriveExtendedPrices(meta, timestamps, closes, session);
+
   const result: ExtendedHoursQuote = {
     session,
     pre,
     post,
     exchangeName: meta.exchangeName ?? null,
     companyName: meta.longName ?? meta.shortName ?? null,
-    regularMarketPrice: regularPrice,
+    regularMarketPrice: meta.regularMarketPrice,
   };
 
   // Matched to getQuote's TTL — both feed the same header row, and the extended-hours
   // delta is measured against the regular price, so letting one go stale while the other
   // refreshes would show a delta between two prices sampled seconds apart.
   extendedCache.set(symbol, { expires: Date.now() + 5_000, data: result });
+  return result;
+}
+
+const watchlistCache = new Map<string, { expires: number; data: WatchlistMarket }>();
+
+/** Downsamples a sparkline so a full watchlist stays a small JSON payload. */
+function sampleSeries(values: number[], maxPoints: number): number[] {
+  if (values.length <= maxPoints) return values;
+  const step = (values.length - 1) / (maxPoints - 1);
+  return Array.from({ length: maxPoints }, (_, i) => values[Math.round(i * step)]);
+}
+
+/**
+ * One Yahoo request per symbol supplies both the intraday sparkline and the after-hours
+ * print. Kept on a 5-minute cache because neither needs minute-level freshness, while
+ * /api/watchlist/quotes keeps the live price on its 60s poll.
+ */
+export async function getWatchlistMarket(symbol: string): Promise<WatchlistMarket> {
+  const hit = watchlistCache.get(symbol);
+  if (hit && hit.expires > Date.now()) return hit.data;
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m&includePrePost=true`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
+  const data = (await res.json()) as YahooChartResponse;
+  const chartResult = data.chart.result?.[0];
+  const meta = chartResult?.meta;
+  if (!meta || !chartResult) throw new Error("YAHOO_NO_DATA");
+
+  const timestamps = chartResult.timestamp ?? [];
+  const closes = chartResult.indicators.quote?.[0]?.close ?? [];
+  const session = computeSession(meta.currentTradingPeriod);
+  const { pre, post: derivedPost } = deriveExtendedPrices(meta, timestamps, closes, session);
+
+  // Keep every non-null print and let the SVG smooth it out. The session periods in
+  // meta can describe the NEXT session while range=1d still returns the previous one
+  // (e.g. before the opening bell), so filtering by them would blank the line.
+  const points = closes.filter((c): c is number => c !== null && Number.isFinite(c));
+
+  // Before the pre-market opens, meta has no after-hours fields yet, but the chart still
+  // ends on the PREVIOUS session's last post-market print. Surface that as the extended
+  // price instead of leaving the row blank until the next session. A print equal to the
+  // regular close means the symbol simply had no after-hours trade — nothing to show.
+  let post = derivedPost;
+  if (!post && session === "closed" && points.length > 0) {
+    const last = points[points.length - 1];
+    const regularPrice = meta.regularMarketPrice;
+    if (regularPrice > 0) {
+      const change = last - regularPrice;
+      if (Math.abs(change) >= 0.005) {
+        post = { price: last, change, changePercent: (change / regularPrice) * 100 };
+      }
+    }
+  }
+
+  const sparkline = sampleSeries(points, 60).map((c) => Math.round(c * 100) / 100);
+
+  const result: WatchlistMarket = { session, pre, post, sparkline };
+  watchlistCache.set(symbol, { expires: Date.now() + 5 * 60_000, data: result });
   return result;
 }
 
