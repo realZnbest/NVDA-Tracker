@@ -531,7 +531,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                       <Sparkline
                         points={snapshot?.sparkline ?? []}
                         color={color}
-                        className="max-sm:col-span-2 max-sm:row-start-2 max-sm:mt-0.5 max-sm:h-12 max-sm:w-full"
+                        className="max-sm:col-span-2 max-sm:row-start-2 max-sm:-mx-4 max-sm:mt-0.5 max-sm:h-14 max-sm:w-[calc(100%+2rem)]"
                       />
 
                       <div className="min-w-0 pl-2 text-right max-sm:col-start-2 max-sm:row-start-1 sm:pl-3">

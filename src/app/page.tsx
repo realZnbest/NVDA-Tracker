@@ -16,7 +16,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-[calc(100dvh-3rem)] flex-col items-center justify-center px-4 py-10">
-      <div className="flex w-[min(500px,85vw)] flex-col items-center gap-6">
+      <div className="flex w-full max-w-[500px] flex-col items-center gap-6">
         <IconWave className="h-10 w-10 text-ch-price" />
 
         <div className="flex flex-col items-center gap-1">
