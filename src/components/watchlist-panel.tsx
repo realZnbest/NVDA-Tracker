@@ -91,13 +91,24 @@ function StockLogo({ symbol }: { symbol: string }) {
   );
 }
 
-function Sparkline({ points, color }: { points: number[]; color: string }) {
+function Sparkline({
+  points,
+  color,
+  className = "",
+}: {
+  points: number[];
+  color: string;
+  className?: string;
+}) {
   const gradientId = useId().replace(/:/g, "");
   const width = 96;
   const height = 40;
+  // Compact rows keep the sparkline inline at ~96px; phones give it the full row width
+  // instead of squeezing it into a 48px square between the symbol and the price.
+  const sizeClass = `h-9 w-12 shrink-0 overflow-visible sm:h-10 sm:w-24 ${className}`;
 
   if (points.length < 2) {
-    return <div className="h-9 w-12 shrink-0 sm:h-10 sm:w-24" aria-hidden="true" />;
+    return <div className={sizeClass} aria-hidden="true" />;
   }
 
   const min = Math.min(...points);
@@ -116,7 +127,7 @@ function Sparkline({ points, color }: { points: number[]; color: string }) {
     <svg
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
-      className="h-9 w-12 shrink-0 overflow-visible sm:h-10 sm:w-24"
+      className={sizeClass}
       aria-hidden="true"
     >
       <defs>
@@ -494,7 +505,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                   >
                     <Link
                       href={`/dashboard/${encodeURIComponent(item.symbol)}`}
-                      className="group grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-4 py-3 transition-colors hover:bg-white/[0.02] sm:gap-3 sm:px-5 sm:py-3.5"
+                      className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 px-4 py-3 transition-colors hover:bg-white/[0.02] sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-3 sm:px-5 sm:py-3.5"
                     >
                       <div className="min-w-0">
                         <div className="mb-1 flex min-h-4 items-center">
@@ -517,9 +528,13 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                         </div>
                       </div>
 
-                      <Sparkline points={snapshot?.sparkline ?? []} color={color} />
+                      <Sparkline
+                        points={snapshot?.sparkline ?? []}
+                        color={color}
+                        className="max-sm:col-span-2 max-sm:row-start-2 max-sm:mt-0.5 max-sm:h-12 max-sm:w-full"
+                      />
 
-                      <div className="min-w-0 pl-2 text-right sm:pl-3">
+                      <div className="min-w-0 pl-2 text-right max-sm:col-start-2 max-sm:row-start-1 sm:pl-3">
                         {extended && (
                           <p className="mb-0.5 hidden whitespace-nowrap text-[0.625rem] text-text-muted min-[390px]:block">
                             {extendedLabel}{" "}
@@ -527,12 +542,16 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                               {priceText(extended.price)}
                             </span>{" "}
                             <span
-                              className="telemetry"
+                              className="telemetry inline-flex items-center gap-0.5"
                               style={{
                                 color: extended.change >= 0 ? "var(--up)" : "var(--down)",
                               }}
                             >
-                              {extended.change >= 0 ? "↗" : "↘"}{" "}
+                              {extended.change >= 0 ? (
+                                <IconArrowUp className="h-2.5 w-2.5" />
+                              ) : (
+                                <IconArrowDown className="h-2.5 w-2.5" />
+                              )}
                               {pctText(extended.changePercent)}
                             </span>
                           </p>
@@ -553,8 +572,12 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
                               backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
                             }}
                           >
-                            {quote.change > 0 && "↗"}
-                            {quote.change < 0 && "↘"}
+                            {quote.change > 0 && (
+                              <IconArrowUp className="h-3 w-3" />
+                            )}
+                            {quote.change < 0 && (
+                              <IconArrowDown className="h-3 w-3" />
+                            )}
                             {pctText(quote.changePercent)}
                           </span>
                         ) : (
