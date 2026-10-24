@@ -476,10 +476,13 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
     srLinesRef.current.forEach((l) => s.candle.removePriceLine(l));
     srLinesRef.current = [];
     if (showSR) {
-      // Levels are derived from a wider structure window than the visible one; a level
-      // below the visible low (or above the visible high) would otherwise pin its axis
-      // label to the pane edge and overlap the time axis. Keep only levels the current
-      // view can actually show.
+      // Levels come from a wider structure window than the view shows, so a level just
+      // outside the visible range would pin its axis label to the pane edge and collide
+      // with the time axis. The padding therefore has to be generous enough to keep the
+      // nearest level that price is *sitting on*: with a 2% pad, NVDA's real แนวรับ at
+      // 208.87 fell 0.65 below the visible low of 210.18 and was dropped, so the chart
+      // showed three resistances stacked overhead and no support at all — the single most
+      // useful line on the screen.
       const targetBars = defaultVisibleBars(
         candles.t,
         timeframe,
@@ -494,7 +497,8 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
         visibleHigh = Math.max(visibleHigh, candles.h[i]);
         visibleLow = Math.min(visibleLow, candles.l[i]);
       }
-      const levelPad = (visibleHigh - visibleLow) * 0.02;
+      const span = visibleHigh - visibleLow;
+      const levelPad = Math.max(span * 0.06, visibleLow * 0.005);
       for (const level of computed.sr) {
         if (level.price < visibleLow - levelPad || level.price > visibleHigh + levelPad) {
           continue;

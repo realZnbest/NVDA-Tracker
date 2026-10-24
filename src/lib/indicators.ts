@@ -209,6 +209,13 @@ export interface SRLevel {
  * Clusters nearby swing pivots into support/resistance levels, scored by how many
  * pivots landed near that price (more touches = a stronger level), keeping the
  * levels closest to the current price.
+ *
+ * A level's side is decided by where it sits relative to the current price, NOT by
+ * whether the pivot was a high or a low. That distinction matters: an old swing high at
+ * 200 is a *support* once price trades at 211 above it — the level was resistance, price
+ * broke through, and it flipped. Splitting the pivots by type first (highs → resistance,
+ * lows → support) threw those flipped levels away entirely; on NVDA's 1M view that was 9
+ * discarded pivots, and it is the main reason the chart looked short of levels.
  */
 export function computeSupportResistance(
   pivots: PivotPoint[],
@@ -218,16 +225,30 @@ export function computeSupportResistance(
   const maxLevels = opts.maxLevels ?? 3;
   const mergeThresholdPct = opts.mergeThresholdPct ?? 0.015;
 
+  /**
+   * Groups pivots that sit within `mergeThresholdPct` of the cluster's centre, measured
+   * against the running mean AND with the cluster's total span capped at the same width.
+   *
+   * Measuring against the previous element instead — as this did — lets a cluster chain
+   * outward one step at a time: 207.37, 208.10, 208.83 … every consecutive pair is within
+   * 1.5% of each other, so 27 separate pivots spanning 207–228 merged into a single
+   * "level" at 216.60. A level 20 dollars wide is not a level, and the real support at
+   * 208.87 disappeared inside it — which is why the chart showed no แนวรับ at all.
+   */
   function clusterPrices(prices: number[]): { price: number; touches: number }[] {
     const sorted = [...prices].sort((a, b) => a - b);
     const clusters: number[][] = [];
     for (const p of sorted) {
       const last = clusters[clusters.length - 1];
-      if (last && p - last[last.length - 1] <= last[last.length - 1] * mergeThresholdPct) {
-        last.push(p);
-      } else {
-        clusters.push([p]);
+      if (last) {
+        const mean = last.reduce((a, b) => a + b, 0) / last.length;
+        const span = Math.max(...last, p) - Math.min(...last, p);
+        if (Math.abs(p - mean) <= mean * mergeThresholdPct && span <= mean * mergeThresholdPct) {
+          last.push(p);
+          continue;
+        }
       }
+      clusters.push([p]);
     }
     return clusters.map((c) => ({
       price: c.reduce((a, b) => a + b, 0) / c.length,
@@ -235,16 +256,15 @@ export function computeSupportResistance(
     }));
   }
 
-  const highs = clusterPrices(pivots.filter((p) => p.type === "high").map((p) => p.price));
-  const lows = clusterPrices(pivots.filter((p) => p.type === "low").map((p) => p.price));
+  const clusters = clusterPrices(pivots.map((p) => p.price));
 
-  const resistance = highs
+  const resistance = clusters
     .filter((c) => c.price > currentPrice)
     .sort((a, b) => b.touches - a.touches || a.price - b.price)
     .slice(0, maxLevels)
     .map((c) => ({ price: c.price, type: "resistance" as const, touches: c.touches }));
 
-  const support = lows
+  const support = clusters
     .filter((c) => c.price < currentPrice)
     .sort((a, b) => b.touches - a.touches || b.price - a.price)
     .slice(0, maxLevels)
