@@ -226,6 +226,24 @@ The stock detail is the existing two-level squarified treemap at `lg+`, now labe
 
 Tile fill is the day's direction mixed into `panel-2`: `up` green above zero, `down` red below, flat at `panel-2` itself, and a dashed muted tile when the quote is missing. The stock detail's scale is symmetric and capped at the 2–6% bound the day requires; the sector overview's is capped at 1.5–3%. Both legends always print the exact ± bound, so a violent day clips as stated instead of silently washing out. The sign is printed in every percentage, so direction never depends on colour alone. Labels appear progressively as the box grows — in the stock detail, ticker down to a 24px sliver, percentage from 56px wide, company name from 110px, price from 94px, with type from 9px micro to `text-lg` on the largest tiles. A field is hidden at that size rather than clipped; a truncated `−0.9…` is not a readout.
 
+#### The market map's stepped scale
+
+The 500-tile map does **not** mix into `panel-2`. A smooth wash makes a −1.1% and a −1.4% company indistinguishable, and telling those two apart at a glance is the whole job of the board — so `marketChangeSurface` paints **six discrete steps per direction** plus a neutral, anchored on TradingView's own S&P 500 colours:
+
+| Band (|%|) | Down | Up |
+|---|---|---|---|
+| < 0.2 | `#c9c9c9` (neutral) | same |
+| 0.2 – 0.5 | `#f7b0b2` | `#8ed8b0` |
+| 0.5 – 1 | `#f78a8e` | `#5fcb96` |
+| 1 – 1.5 | `#f2636a` | `#35bc7c` |
+| 1.5 – 2 | `#e8404b` | `#16a866` |
+| 2 – 2.5 | `#c92c39` | `#067a48` |
+| ≥ 2.5 | `#9b1f2b` | `#076637` |
+
+A company that barely moved reads as a **light near-white grey**, not a faint red or green tint, so the eye goes straight to what actually moved. The bands are placed against the real distribution (median |change| ≈ 1.2%, p75 ≈ 2.2%), so the bulk of names land in the middle steps rather than piling into one.
+
+Because a flat fill can be near-white, tile ink is computed per fill rather than fixed: `surfaceFor` picks dark or light text from the fill's WCAG relative luminance, switching at `L = 0.16` — the crossover solved from the two ink luminances, not an eyeballed 0.22, which would put light text on the mid red at a genuinely hard-to-read 3.4:1. Every labelled tile on the board now clears 4.5:1 (worst measured: 4.54:1).
+
 The strip between toolbar and map follows the same instrument-readout pattern. In the sector overview it reports sector breadth (advancers, decliners, flat, missing), the sector-weight-weighted average, and the leader/laggard; hovering or focusing a sector replaces it with that sector's ETF, price in USD, change, and market weight. In the stock detail it reports the visible stock breadth, the cap-weighted average, and the leader/laggard; hovering or focusing a tile replaces it with that ticker's name, price in USD, change, market cap, and sector. Stock tiles link to `/dashboard/[symbol]` with prefetch off, so sweeping the wall doesn't fan out 36 navigations, and focus/blur drive the same readout as the pointer.
 
 Below `lg` the sector treemap becomes a compact weight table: one row per sector, with the ETF, Thai name, a proportional weight bar, the exact weight, and the signed change. The stock treemap becomes the existing sector-grouped proportional list: each company keeps a width share of its row proportional to market cap (minimum 68px) but rows stay a fixed 56px tall, so tickers and percentages remain legible instead of shrinking into the mosaic; sector headers repeat the full label, company count, and cap-weighted change. Both mobile views use the same colour scales and detailed Thai `aria-label`s; the progressive multi-field label is a desktop-only affordance.

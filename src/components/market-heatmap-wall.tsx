@@ -80,7 +80,7 @@ const MarketTile = memo(function MarketTile({
         borderStyle: surface.dashed ? "dashed" : "solid",
       }}
     >
-      <MarketTileContent tile={tile} width={width} height={height} />
+      <MarketTileContent tile={tile} width={width} height={height} ink={surface.text} />
     </Link>
   );
 });
@@ -91,10 +91,13 @@ function MarketTileContent({
   tile,
   width,
   height,
+  ink,
 }: {
   tile: WeightedMarketTile;
   width: number;
   height: number;
+  /** Ink colour for this tile's fill, so light neutrals and deep reds stay readable. */
+  ink: string;
 }) {
   const showLogo = Boolean(tile.logoUrl) && width >= 46 && height >= 46;
   const showTicker = width >= 26 && height >= 16;
@@ -125,13 +128,14 @@ function MarketTileContent({
         />
       ) : null}
       {showTicker ? (
-        <span className={`max-w-full truncate font-semibold text-text-primary ${tickerClass}`}>
+        <span className={`max-w-full truncate font-semibold ${tickerClass}`} style={{ color: ink }}>
           {tile.symbol}
         </span>
       ) : null}
       {showPercent ? (
         <span
-          className={`telemetry max-w-full truncate font-medium text-text-primary ${percentClass}`}
+          className={`telemetry max-w-full truncate font-medium ${percentClass}`}
+          style={{ color: ink }}
         >
           {formatPercent(tile.changePercent)}
         </span>
@@ -247,6 +251,7 @@ function MobileTile({
   width: number;
   height: number;
 }) {
+  const surface = tileSurface(tile);
   return (
     <Link
       href={`/dashboard/${encodeURIComponent(tile.symbol)}`}
@@ -258,12 +263,12 @@ function MobileTile({
         top: y,
         width,
         height,
-        background: tileSurface(tile).background,
-        borderColor: tileSurface(tile).border,
-        borderStyle: tileSurface(tile).dashed ? "dashed" : "solid",
+        background: surface.background,
+        borderColor: surface.border,
+        borderStyle: surface.dashed ? "dashed" : "solid",
       }}
     >
-      <MarketTileContent tile={tile} width={width} height={height} />
+      <MarketTileContent tile={tile} width={width} height={height} ink={surface.text} />
     </Link>
   );
 }
@@ -416,32 +421,36 @@ export function MarketHeatmapMobile({
                 ) : null}
               </button>
               <div className="absolute inset-x-0 bottom-0" style={{ top: block.labelHeight }}>
-                {block.tiles.map((tileBox) => (
-                  <span
-                    key={tileBox.tile.symbol}
-                    aria-hidden="true"
-                    className="absolute border"
-                    style={{
-                      left: tileBox.x,
-                      top: tileBox.y,
-                      width: tileBox.width,
-                      height: tileBox.height,
-                      background: tileSurface(tileBox.tile).background,
-                      borderColor: tileSurface(tileBox.tile).border,
-                      borderStyle: tileSurface(tileBox.tile).dashed ? "dashed" : "solid",
-                    }}
-                  >
-                    {tileBox.width >= 48 && tileBox.height >= 30 ? (
-                      <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden text-center leading-none">
-                        <MarketTileContent
-                          tile={tileBox.tile}
-                          width={tileBox.width}
-                          height={tileBox.height}
-                        />
-                      </span>
-                    ) : null}
-                  </span>
-                ))}
+                {block.tiles.map((tileBox) => {
+                  const surface = tileSurface(tileBox.tile);
+                  return (
+                    <span
+                      key={tileBox.tile.symbol}
+                      aria-hidden="true"
+                      className="absolute border"
+                      style={{
+                        left: tileBox.x,
+                        top: tileBox.y,
+                        width: tileBox.width,
+                        height: tileBox.height,
+                        background: surface.background,
+                        borderColor: surface.border,
+                        borderStyle: surface.dashed ? "dashed" : "solid",
+                      }}
+                    >
+                      {tileBox.width >= 48 && tileBox.height >= 30 ? (
+                        <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden text-center leading-none">
+                          <MarketTileContent
+                            tile={tileBox.tile}
+                            width={tileBox.width}
+                            height={tileBox.height}
+                            ink={surface.text}
+                          />
+                        </span>
+                      ) : null}
+                    </span>
+                  );
+                })}
               </div>
             </section>
           ))
