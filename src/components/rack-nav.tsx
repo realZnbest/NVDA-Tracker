@@ -21,7 +21,7 @@ import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-inpu
 const NAV_ITEMS = [
   { href: "/dashboard", label: "ราคา / แนวโน้ม", icon: IconWave, symbolAware: true },
   { href: "/watchlist", label: "รายการติดตาม", icon: IconStar, symbolAware: false },
-  { href: "/heatmap", label: "ฮีตแมป", icon: IconGrid, symbolAware: false },
+  { href: "/heatmap", label: "ฮีตแมพ", icon: IconGrid, symbolAware: false },
   { href: "/financials", label: "งบการเงิน", icon: IconLedger, symbolAware: true },
   { href: "/news", label: "ข่าว", icon: IconSignal, symbolAware: true },
   { href: "/portfolio", label: "พอร์ตของฉัน", icon: IconWallet, symbolAware: false },

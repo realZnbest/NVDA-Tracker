@@ -153,6 +153,14 @@ export function IconChevronDown({ className }: IconProps) {
   );
 }
 
+export function IconChevronLeft({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+  );
+}
+
 export function IconInfo({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...base}>

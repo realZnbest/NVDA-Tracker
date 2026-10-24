@@ -26,6 +26,9 @@ import {
 
 const LIVE_REFRESH_MS = 60_000;
 const CLOSED_REFRESH_MS = 5 * 60_000;
+/** Phone board: one near-square canvas so the whole index fits the screen the way the
+ *  TradingView board does; the viewport width is the real cap, this is the fallback. */
+const MOBILE_MAP_SIZE = 360;
 
 function MarketReadout({
   model,
@@ -290,7 +293,7 @@ export function MarketHeatmapView() {
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-seam px-3 py-2.5 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="module-label">S&amp;P 500 MAP</span>
+          <span className="module-label">S&amp;P 500 INDEX</span>
           <SessionBadge session={data.session} />
           <span className="text-[10px] text-text-muted">{model.tiles.length} หุ้น</span>
         </div>
@@ -352,11 +355,7 @@ export function MarketHeatmapView() {
 
       <MarketReadout model={model} tile={hoveredTile} />
 
-      <div
-        className={
-          fullscreen ? "min-h-0 flex-1 p-1.5 sm:p-2" : "p-1.5 sm:p-2"
-        }
-      >
+      <div className={fullscreen ? "min-h-0 flex-1 p-1.5 sm:p-2" : "p-1.5 sm:p-2"}>
         <div className="hidden h-full md:block">
           <MarketHeatmapWall
             sectors={model.sectors}
@@ -366,7 +365,7 @@ export function MarketHeatmapView() {
           />
         </div>
         <div className="md:hidden">
-          <MarketHeatmapMobile sectors={model.sectors} />
+          <MarketHeatmapMobile sectors={model.sectors} size={MOBILE_MAP_SIZE} />
         </div>
       </div>
 
