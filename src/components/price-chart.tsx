@@ -281,15 +281,22 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
 
     // Support/resistance and BOS/CHoCH are only meaningful over recent price action —
     // the candle fetch itself can span decades (so zooming out reveals real history),
-    // but a "support" level from NVDA's 1999 IPO price is just noise today. Scope
-    // structure detection to a multiple of the selected tab's own window instead.
+    // but a "support" level from NVDA's 1999 IPO price is just noise today.
+    //
+    // The window is the selected tab's own scope widened by 50%, floored at 30 days and
+    // capped at a year. The old `scope × 4` reached 20 years on the 5Y tab, which pulled
+    // in NVDA's pre-split quotes (the 10:1 splits of 2000/2001/2006 left pivots at $0.03)
+    // and let a $0.29 "level" take one of the three support slots. A year is long enough
+    // for a real level to show on any tab and short enough that pre-split prices and
+    // decade-old regimes stay out.
     const tf = TIMEFRAMES.find((t) => t.key === timeframe);
     const lastTime = candles.t[candles.t.length - 1];
     const scopeDaysNum =
       tf?.scopeDays === "ytd"
         ? (lastTime - Date.UTC(new Date(lastTime * 1000).getUTCFullYear(), 0, 1) / 1000) / 86400
         : tf?.scopeDays ?? 365;
-    const windowStart = lastTime - Math.max(scopeDaysNum * 4, 30) * 24 * 60 * 60;
+    const windowDays = Math.min(Math.max(scopeDaysNum * 1.5, 30), 365);
+    const windowStart = lastTime - windowDays * 24 * 60 * 60;
     let startIndex = candles.t.findIndex((t) => t >= windowStart);
     if (startIndex === -1) startIndex = 0;
 

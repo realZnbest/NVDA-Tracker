@@ -234,6 +234,13 @@ export function computeSupportResistance(
    * 1.5% of each other, so 27 separate pivots spanning 207–228 merged into a single
    * "level" at 216.60. A level 20 dollars wide is not a level, and the real support at
    * 208.87 disappeared inside it — which is why the chart showed no แนวรับ at all.
+   *
+   * `currentPrice` is passed in so a cluster can never straddle it. Without that guard a
+   * level whose members sit on both sides of the price is classified by its mean alone:
+   * NVDA's nearest pivot low was 210.18 (below the 210.96 price, so a support) but it sat
+   * 0.89% from 212.05 and merged with it, dragging the mean above the price — the level
+   * flipped to a resistance and the support disappeared. Splitting at the price keeps
+   * each side honest.
    */
   function clusterPrices(prices: number[]): { price: number; touches: number }[] {
     const sorted = [...prices].sort((a, b) => a - b);
@@ -242,8 +249,14 @@ export function computeSupportResistance(
       const last = clusters[clusters.length - 1];
       if (last) {
         const mean = last.reduce((a, b) => a + b, 0) / last.length;
-        const span = Math.max(...last, p) - Math.min(...last, p);
-        if (Math.abs(p - mean) <= mean * mergeThresholdPct && span <= mean * mergeThresholdPct) {
+        const lo = Math.min(...last, p);
+        const hi = Math.max(...last, p);
+        const straddlesPrice = lo < currentPrice && hi > currentPrice;
+        if (
+          !straddlesPrice &&
+          Math.abs(p - mean) <= mean * mergeThresholdPct &&
+          hi - lo <= mean * mergeThresholdPct
+        ) {
           last.push(p);
           continue;
         }
@@ -258,6 +271,8 @@ export function computeSupportResistance(
 
   const clusters = clusterPrices(pivots.map((p) => p.price));
 
+  // A level sitting exactly on the price is neither support nor resistance; the strict
+  // comparisons below already exclude it, which is the correct behaviour.
   const resistance = clusters
     .filter((c) => c.price > currentPrice)
     .sort((a, b) => b.touches - a.touches || a.price - b.price)

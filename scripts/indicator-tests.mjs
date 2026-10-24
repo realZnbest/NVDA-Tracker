@@ -140,6 +140,30 @@ console.log("  chained pivots ->", JSON.stringify(chainSupport));
 check("no runaway chaining: 100/102 cluster", chainSupport.some(x => Math.abs(x.price - 101) < 0.01) ? 1 : 0, 1);
 check("no runaway chaining: 104/106 cluster", chainSupport.some(x => Math.abs(x.price - 105) < 0.01) ? 1 : 0, 1);
 
+// A cluster must never straddle the current price. 99 and 101 are 2% apart, so without
+// the guard they merge to a mean of 100 and get classified as one level, even though 99
+// is below the 100 price (support) and 101 is above it (resistance).
+const straddle = [
+  { index: 1, time: 1, price: 99, type: "low" },
+  { index: 2, time: 2, price: 101, type: "high" },
+];
+const straddleSr = computeSupportResistance(straddle, 100, { mergeThresholdPct: 0.03 });
+console.log("  straddling pivots ->", JSON.stringify(straddleSr));
+check("straddle: 99 stays a support", straddleSr.some(x => x.type === "support" && Math.abs(x.price - 99) < 0.01) ? 1 : 0, 1);
+check("straddle: 101 stays a resistance", straddleSr.some(x => x.type === "resistance" && Math.abs(x.price - 101) < 0.01) ? 1 : 0, 1);
+
+// NVDA's real regression: a pivot low just below the price must not be swallowed by a
+// cluster whose mean sits above it.
+const nvda = [
+  { index: 1, time: 1, price: 210.18, type: "low" },
+  { index: 2, time: 2, price: 211.26, type: "low" },
+  { index: 3, time: 3, price: 212.05, type: "low" },
+  { index: 4, time: 4, price: 213.0, type: "low" },
+];
+const nvdaSr = computeSupportResistance(nvda, 210.96);
+console.log("  NVDA regression ->", JSON.stringify(nvdaSr));
+check("NVDA: support at 210.18 survives", nvdaSr.some(x => x.type === "support" && Math.abs(x.price - 210.18) < 0.02) ? 1 : 0, 1);
+
 console.log("\n=== detectStructureBreaks ===");
 // Rising series breaking a swing high -> BOS up, then a break down -> CHoCH
 const sh = [1, 2, 3, 4, 5, 4, 3, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 2, 3];
