@@ -38,15 +38,27 @@ export function isValidWatchlistSymbol(symbol: string): boolean {
   return WATCHLIST_SYMBOL_PATTERN.test(symbol);
 }
 
+/**
+ * The list, quotes and market routes each read it on every poll, and every read is a
+ * network round trip to Turso. A few seconds of in-process cache collapses a page load's
+ * three reads into one; writes in this process clear it, and the short TTL bounds how
+ * long a write made on another serverless instance can stay invisible.
+ */
+const LIST_CACHE_TTL_MS = 5_000;
+let listCache: { expires: number; items: WatchlistItem[] } | null = null;
+
 /** Ordered exactly how the owner arranged the list; newest additions fall to the end. */
 export async function listWatchlist(): Promise<WatchlistItem[]> {
+  if (listCache && listCache.expires > Date.now()) return listCache.items;
   const db = await getDb();
   const result = await db.execute(
     `SELECT symbol, name, sortOrder, createdAt
        FROM watchlist_items
       ORDER BY sortOrder ASC, createdAt ASC`
   );
-  return (result.rows as unknown as WatchlistRow[]).map(rowToItem);
+  const items = (result.rows as unknown as WatchlistRow[]).map(rowToItem);
+  listCache = { expires: Date.now() + LIST_CACHE_TTL_MS, items };
+  return items;
 }
 
 /**
@@ -60,6 +72,7 @@ export async function addWatchlistItem(input: {
   const symbol = normalizeWatchlistSymbol(input.symbol);
   if (!isValidWatchlistSymbol(symbol)) throw new WatchlistError("INVALID_SYMBOL");
 
+  listCache = null;
   const db = await getDb();
   const existing = await db.execute({
     sql: `SELECT symbol, name, sortOrder, createdAt FROM watchlist_items WHERE symbol = ?`,
@@ -100,17 +113,20 @@ export async function addWatchlistItem(input: {
           VALUES (?, ?, ?, ?)`,
     args: [item.symbol, item.name, item.sortOrder, item.createdAt],
   });
+  listCache = null;
   return item;
 }
 
 export async function deleteWatchlistItem(symbol: string): Promise<void> {
   const normalized = normalizeWatchlistSymbol(symbol);
   if (!isValidWatchlistSymbol(normalized)) return;
+  listCache = null;
   const db = await getDb();
   await db.execute({
     sql: `DELETE FROM watchlist_items WHERE symbol = ?`,
     args: [normalized],
   });
+  listCache = null;
 }
 
 /**
@@ -119,6 +135,7 @@ export async function deleteWatchlistItem(symbol: string): Promise<void> {
  * order would otherwise shuffle the remainder unpredictably.
  */
 export async function reorderWatchlist(symbols: string[]): Promise<WatchlistItem[]> {
+  listCache = null;
   const db = await getDb();
   const existing = await listWatchlist();
   const existingSymbols = new Set(existing.map((item) => item.symbol));
@@ -141,11 +158,14 @@ export async function reorderWatchlist(symbols: string[]): Promise<WatchlistItem
       .filter((symbol) => !requested.includes(symbol)),
   ];
 
-  for (let i = 0; i < ordered.length; i++) {
-    await db.execute({
+  // One round trip (and one transaction) instead of a sequential UPDATE per row.
+  await db.batch(
+    ordered.map((symbol, i) => ({
       sql: `UPDATE watchlist_items SET sortOrder = ? WHERE symbol = ?`,
-      args: [i, ordered[i]],
-    });
-  }
+      args: [i, symbol],
+    })),
+    "write"
+  );
+  listCache = null;
   return listWatchlist();
 }

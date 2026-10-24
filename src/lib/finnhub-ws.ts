@@ -23,6 +23,8 @@ interface WsState {
   /** Last time each subscribed symbol was requested by a UI poll, used for LRU eviction. */
   lastTouched: Map<string, number>;
   waiters: Map<string, Set<(tick: Tick) => void>>;
+  /** When a wait for a first tick last timed out empty; optional so a hot-reloaded old state still works. */
+  tickMisses?: Map<string, number>;
   socket: WebSocket | null;
   connecting: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
@@ -220,6 +222,13 @@ export function waitForLiveTick(symbol: string, timeoutMs: number): Promise<Tick
   const existing = s.ticks.get(symbol);
   if (existing) return Promise.resolve(existing);
 
+  // A symbol with no tick after a full wait is shut (or illiquid). Waiting out the
+  // timeout again on every 3s poll made /api/quote take 1.5s each time while the market
+  // was closed, so only retry once a minute.
+  const misses = (s.tickMisses ??= new Map());
+  const lastMiss = misses.get(symbol);
+  if (lastMiss !== undefined && Date.now() - lastMiss < 60_000) return Promise.resolve(null);
+
   return new Promise((resolve) => {
     const onTick = (tick: Tick) => {
       clearTimeout(timer);
@@ -231,7 +240,9 @@ export function waitForLiveTick(symbol: string, timeoutMs: number): Promise<Tick
 
     const timer = setTimeout(() => {
       s.waiters.get(symbol)?.delete(onTick);
-      resolve(s.ticks.get(symbol) ?? null);
+      const late = s.ticks.get(symbol) ?? null;
+      if (!late) misses.set(symbol, Date.now());
+      resolve(late);
     }, timeoutMs);
   });
 }

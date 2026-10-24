@@ -221,12 +221,6 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
   }, []);
 
   const loadQuotes = useCallback(async () => {
-    if (items.length === 0) {
-      setQuotes({});
-      setQuoteErrors({});
-      setLive(false);
-      return;
-    }
     try {
       const res = await fetch(
         `/api/watchlist/quotes${preview ? `?limit=${PREVIEW_LIMIT}` : ""}`,
@@ -251,13 +245,9 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
       // Silent: keep the last good quote rather than blanking the whole table on a
       // transient provider/network hiccup.
     }
-  }, [items.length, preview]);
+  }, [preview]);
 
   const loadMarket = useCallback(async () => {
-    if (items.length === 0) {
-      setMarket({});
-      return;
-    }
     try {
       const res = await fetch(
         `/api/watchlist/market${preview ? `?limit=${PREVIEW_LIMIT}` : ""}`,
@@ -271,10 +261,16 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
     } catch {
       // Sparkline / after-hours are best-effort; the quote rows still render.
     }
-  }, [items.length, preview]);
+  }, [preview]);
+
+  /** Set when the auth effect already fired quotes + market alongside the list, so the
+   *  first arrival of the symbols doesn't trigger the same two requests again. */
+  const prefetchedRef = useRef(false);
+  const symbolsKey = items.map((item) => item.symbol).join(",");
 
   useEffect(() => {
     if (authStatus !== "authenticated") {
+      prefetchedRef.current = false;
       setItems([]);
       setQuotes({});
       setQuoteErrors({});
@@ -285,32 +281,41 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
     }
     let cancelled = false;
     setLoading(true);
+    // quotes/market read the list server-side themselves, so they don't need to wait for
+    // /api/watchlist to come back — all three go out together instead of in sequence.
+    prefetchedRef.current = true;
+    void loadQuotes();
+    void loadMarket();
     loadItems().finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [authStatus, loadItems]);
+  }, [authStatus, loadItems, loadQuotes, loadMarket]);
 
   useEffect(() => {
     if (authStatus !== "authenticated") return;
-    if (items.length === 0) {
-      setQuotes({});
-      setQuoteErrors({});
-      setAsOf(null);
-      setLive(false);
+    if (symbolsKey === "") {
+      // Nothing followed (yet): the prefetched responses are empty, nothing to refetch.
+      // Once the list has finished loading and is still empty, drop the flag so the
+      // first symbol the owner adds is fetched instead of being skipped as "prefetched".
+      if (!prefetchedRef.current) {
+        setQuotes({});
+        setQuoteErrors({});
+        setMarket({});
+        setAsOf(null);
+        setLive(false);
+      } else if (!loading) {
+        prefetchedRef.current = false;
+      }
+      return;
+    }
+    if (prefetchedRef.current) {
+      prefetchedRef.current = false;
       return;
     }
     void loadQuotes();
-  }, [authStatus, items, loadQuotes]);
-
-  useEffect(() => {
-    if (authStatus !== "authenticated") return;
-    if (items.length === 0) {
-      setMarket({});
-      return;
-    }
     void loadMarket();
-  }, [authStatus, items, loadMarket]);
+  }, [authStatus, symbolsKey, loading, loadQuotes, loadMarket]);
 
   // One session for the whole list: if any followed instrument is trading, prices are
   // moving somewhere on the page, so keep the fast cadence. The slow cadence only when
