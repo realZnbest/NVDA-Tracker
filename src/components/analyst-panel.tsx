@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import type { FinnhubRecommendationTrend } from "@/lib/finnhub";
 
+interface PriceTargets {
+  mean: number;
+  high: number;
+  low: number;
+}
+
 interface AnalystResponse {
   trends: FinnhubRecommendationTrend[];
+  targets: PriceTargets | null;
 }
 
 /** Weighted from -2 (all strong sell) to +2 (all strong buy), mapped to a Thai label. */
@@ -28,6 +35,7 @@ export function AnalystPanel({
   embedded?: boolean;
 }) {
   const [data, setData] = useState<AnalystResponse | null>(null);
+  const [price, setPrice] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key" | "no_data">(
     "loading"
   );
@@ -47,6 +55,18 @@ export function AnalystPanel({
         setStatus("ready");
       })
       .catch(() => !cancelled && setStatus("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPrice(null);
+    fetch(`/api/quote?symbol=${symbol}`)
+      .then((r) => r.json())
+      .then((q) => !cancelled && q.quote && setPrice(q.quote.c as number))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -82,12 +102,26 @@ export function AnalystPanel({
         </p>
       )}
 
-      {status === "ready" && data && <RatingBreakdown trend={data.trends[data.trends.length - 1]} />}
+      {status === "ready" && data && (
+        <RatingBreakdown
+          trend={data.trends[data.trends.length - 1]}
+          targets={data.targets}
+          price={price}
+        />
+      )}
     </div>
   );
 }
 
-function RatingBreakdown({ trend }: { trend: FinnhubRecommendationTrend }) {
+function RatingBreakdown({
+  trend,
+  targets,
+  price,
+}: {
+  trend: FinnhubRecommendationTrend;
+  targets: PriceTargets | null;
+  price: number | null;
+}) {
   const segments: { key: string; count: number; color: string; label: string }[] = [
     { key: "strongBuy", count: trend.strongBuy, color: "var(--up)", label: "ซื้อทันที" },
     { key: "buy", count: trend.buy, color: "#7fd99a", label: "ซื้อ" },
@@ -147,10 +181,48 @@ function RatingBreakdown({ trend }: { trend: FinnhubRecommendationTrend }) {
         ))}
       </div>
 
+      {targets && <PriceTargetRows targets={targets} price={price} />}
+
       <p className="text-[10px] leading-relaxed text-text-muted">
         ข้อมูลจากบทวิเคราะห์ล่าสุด
         {periodLabel ? ` · ${periodLabel}` : ""}
       </p>
+    </div>
+  );
+}
+
+function PriceTargetRows({ targets, price }: { targets: PriceTargets; price: number | null }) {
+  const rows = [
+    { key: "mean", label: "เป้าเฉลี่ย", value: targets.mean },
+    { key: "high", label: "เป้าสูงสุด", value: targets.high },
+    { key: "low", label: "เป้าต่ำสุด", value: targets.low },
+  ];
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="module-label">ราคาเป้าหมาย</div>
+      {rows.map((row) => {
+        const upside = price ? ((row.value - price) / price) * 100 : null;
+        return (
+          <span
+            key={row.key}
+            className="flex items-center justify-between gap-2 border-b border-seam/40 pb-1 text-[11px] text-text-secondary"
+          >
+            <span>{row.label}</span>
+            <span className="flex items-baseline gap-2">
+              <span className="telemetry text-text-primary">${row.value.toFixed(2)}</span>
+              {upside !== null && (
+                <span
+                  className="telemetry w-14 text-right text-[10px]"
+                  style={{ color: upside >= 0 ? "var(--up)" : "var(--down)" }}
+                >
+                  {upside >= 0 ? "+" : ""}
+                  {upside.toFixed(1)}%
+                </span>
+              )}
+            </span>
+          </span>
+        );
+      })}
     </div>
   );
 }

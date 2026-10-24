@@ -428,3 +428,74 @@ export async function getYahooCandles(
   cache.set(cacheKey, { expires: Date.now() + candleCacheTtl(interval), data: candles });
   return candles;
 }
+
+export interface AnalystPriceTargets {
+  mean: number;
+  high: number;
+  low: number;
+}
+
+const targetCache = new Map<string, { expires: number; data: AnalystPriceTargets | null }>();
+let crumbCache: { expires: number; cookie: string; crumb: string } | null = null;
+
+/** Yahoo's quoteSummary endpoint rejects requests without a session cookie + crumb pair. */
+async function getYahooCrumb(): Promise<{ cookie: string; crumb: string }> {
+  if (crumbCache && crumbCache.expires > Date.now()) return crumbCache;
+  const headers = { "User-Agent": "Mozilla/5.0" };
+  const seed = await fetch("https://fc.yahoo.com", { headers, cache: "no-store", redirect: "manual" });
+  const cookie = seed.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  const res = await fetch("https://query1.finance.yahoo.com/v1/test/getcrumb", {
+    headers: { ...headers, Cookie: cookie },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
+  const crumb = await res.text();
+  crumbCache = { expires: Date.now() + 60 * 60_000, cookie, crumb };
+  return crumbCache;
+}
+
+/**
+ * Analyst mean/high/low price targets. Finnhub's /stock/price-target is paid-only, so
+ * this comes from Yahoo's financialData module. Best-effort: null when unavailable.
+ */
+export async function getAnalystPriceTargets(symbol: string): Promise<AnalystPriceTargets | null> {
+  const hit = targetCache.get(symbol);
+  if (hit && hit.expires > Date.now()) return hit.data;
+
+  try {
+    const { cookie, crumb } = await getYahooCrumb();
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=financialData&crumb=${encodeURIComponent(crumb)}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0", Cookie: cookie },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      if (res.status === 401) crumbCache = null;
+      return null;
+    }
+    const json = (await res.json()) as {
+      quoteSummary?: {
+        result?: Array<{
+          financialData?: {
+            targetMeanPrice?: { raw?: number };
+            targetHighPrice?: { raw?: number };
+            targetLowPrice?: { raw?: number };
+          };
+        }> | null;
+      };
+    };
+    const fd = json.quoteSummary?.result?.[0]?.financialData;
+    const mean = fd?.targetMeanPrice?.raw;
+    const high = fd?.targetHighPrice?.raw;
+    const low = fd?.targetLowPrice?.raw;
+    const data =
+      mean !== undefined && high !== undefined && low !== undefined ? { mean, high, low } : null;
+    targetCache.set(symbol, { expires: Date.now() + 6 * 60 * 60_000, data });
+    return data;
+  } catch {
+    return null;
+  }
+}

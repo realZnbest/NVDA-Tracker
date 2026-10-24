@@ -247,6 +247,25 @@ export function getEarningsCalendar(symbol: string, from: string, to: string) {
   );
 }
 
+export interface FinnhubEarningsSurprise {
+  symbol: string;
+  /** Fiscal quarter end date (YYYY-MM-DD) — Finnhub doesn't expose the report date here. */
+  period: string;
+  year: number;
+  quarter: number;
+  estimate: number | null;
+  actual: number | null;
+  surprisePercent: number | null;
+}
+
+export function getEarningsSurprises(symbol: string) {
+  return fetchFinnhub<FinnhubEarningsSurprise[]>(
+    "/stock/earnings",
+    { symbol, limit: 8 },
+    6 * 60 * 60_000
+  );
+}
+
 export interface FinnhubSearchResult {
   symbol: string;
   displaySymbol: string;

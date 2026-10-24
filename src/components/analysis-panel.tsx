@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AnalysisRead } from "@/lib/analysis";
+import { usePersistentState } from "@/lib/use-persistent-state";
 import { computeAggregatePosition, computePositionMetrics, type PositionLot } from "@/lib/position";
 import { useAlertsContext } from "./alerts-provider";
 import type { TimeframeKey } from "@/lib/timeframes";
@@ -182,6 +183,7 @@ export function AnalysisPanel({
                   ({position.pnl >= 0 ? "+" : ""}${position.pnl.toFixed(2)})
                 </span>
               </p>
+              <PositionNote symbol={symbol} />
             </div>
           )}
 
@@ -225,5 +227,19 @@ function ReadSection({
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Private per-symbol note, kept in this browser only (localStorage) — never sent to the server. */
+function PositionNote({ symbol }: { symbol: string }) {
+  const [note, setNote] = usePersistentState(`position-note:${symbol}`, "");
+  return (
+    <textarea
+      value={note}
+      onChange={(e) => setNote(e.target.value)}
+      placeholder="โน้ตของฉัน (เก็บในเครื่องนี้เท่านั้น)"
+      rows={2}
+      className="mt-2 w-full resize-none rounded border border-seam bg-panel-2 px-2 py-1.5 text-[11px] text-text-primary placeholder:text-text-muted"
+    />
   );
 }

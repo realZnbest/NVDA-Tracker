@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import type { FinnhubEarningsEvent } from "@/lib/finnhub";
 import { IconCalendar } from "./icons";
 
+interface EarningsResult {
+  period: string;
+  year: number;
+  quarter: number;
+  estimate: number | null;
+  actual: number | null;
+}
+
 const HOUR_LABEL_TH: Record<string, string> = {
   bmo: "ก่อนตลาดเปิด",
   amc: "หลังตลาดปิด",
@@ -35,6 +43,7 @@ export function EarningsCountdown({
   embedded?: boolean;
 }) {
   const [event, setEvent] = useState<FinnhubEarningsEvent | null>(null);
+  const [history, setHistory] = useState<EarningsResult[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "no_data" | "no_key" | "error">(
     "loading"
   );
@@ -49,6 +58,7 @@ export function EarningsCountdown({
         if (cancelled) return;
         if (data.error === "MISSING_API_KEY") return setStatus("no_key");
         if (data.error) return setStatus("error");
+        setHistory(data.history ?? []);
         if (!data.event) return setStatus("no_data");
         setEvent(data.event);
         setStatus("ready");
@@ -148,6 +158,56 @@ export function EarningsCountdown({
           )}
         </div>
       )}
+
+      {history.length > 0 && <EarningsHistory history={history} />}
+    </div>
+  );
+}
+
+function EarningsHistory({ history }: { history: EarningsResult[] }) {
+  const beats = history.filter((h) => (h.actual ?? 0) >= (h.estimate ?? 0)).length;
+  return (
+    <div className="mt-3 flex flex-col gap-1.5 border-t border-seam pt-3">
+      <div className="flex items-baseline justify-between">
+        <span className="module-label">ผลย้อนหลัง {history.length} ไตรมาส</span>
+        <span className="telemetry text-[10px] text-text-secondary">
+          ชนะคาด {beats}/{history.length} ({Math.round((beats / history.length) * 100)}%)
+        </span>
+      </div>
+      {history.map((h) => {
+        const beat = (h.actual ?? 0) >= (h.estimate ?? 0);
+        return (
+          <div
+            key={h.period}
+            className="flex items-center justify-between gap-2 border-b border-seam/40 pb-1 text-[11px]"
+          >
+            <span className="flex flex-col">
+              <span className="text-text-secondary">
+                Q{h.quarter} FY{String(h.year).slice(-2)}
+              </span>
+              <span className="telemetry text-[10px] text-text-muted">
+                {/* Finnhub gives the fiscal quarter end, not the announcement date. */}
+                งวด{" "}
+                {new Date(`${h.period}T00:00:00`).toLocaleDateString("th-TH-u-ca-gregory", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            </span>
+            <span className="telemetry text-text-muted">
+              คาด ${h.estimate?.toFixed(2)} → จริง{" "}
+              <span className="text-text-primary">${h.actual?.toFixed(2)}</span>
+            </span>
+            <span
+              className="telemetry w-12 text-right text-[10px]"
+              style={{ color: beat ? "var(--up)" : "var(--down)" }}
+            >
+              {beat ? "Beat" : "Miss"}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
