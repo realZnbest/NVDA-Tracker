@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePersistentState } from "@/lib/use-persistent-state";
 import { computeAggregatePosition, computePositionMetrics, type PositionLot } from "@/lib/position";
 import { IconPlus, IconTrash } from "./icons";
 import { useAlertsContext } from "./alerts-provider";
@@ -142,7 +143,8 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
   return (
     <div className="flex flex-col gap-4">
       {metrics && aggregate && (
-        <div className="module p-4 flex flex-wrap gap-6">
+        <div className="module p-4 flex flex-col gap-3">
+          <div className="flex flex-wrap gap-6">
           <Stat label="หุ้นทั้งหมด" value={aggregate.totalShares.toLocaleString()} />
           <Stat label="ต้นทุนเฉลี่ย" value={`$${aggregate.avgCost.toFixed(2)}`} />
           <Stat label="ต้นทุนรวม" value={`$${metrics.costBasis.toFixed(2)}`} />
@@ -154,6 +156,8 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
             }${metrics.unrealizedPnlPercent.toFixed(2)}%)`}
             color={metrics.unrealizedPnl >= 0 ? "var(--up)" : "var(--down)"}
           />
+          </div>
+          <PositionNote symbol={symbol} />
         </div>
       )}
 
@@ -327,5 +331,19 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
         {value}
       </span>
     </div>
+  );
+}
+
+/** Private per-symbol note, kept in this browser only (localStorage) — never sent to the server. */
+function PositionNote({ symbol }: { symbol: string }) {
+  const [note, setNote] = usePersistentState(`position-note:${symbol}`, "");
+  return (
+    <textarea
+      value={note}
+      onChange={(e) => setNote(e.target.value)}
+      placeholder="โน้ตของฉัน (เก็บในเครื่องนี้เท่านั้น)"
+      rows={2}
+      className="w-full resize-none rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted"
+    />
   );
 }
