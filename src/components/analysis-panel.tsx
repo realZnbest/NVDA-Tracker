@@ -129,22 +129,12 @@ export function AnalysisPanel({
 
       {status === "ready" && read && verdict && (
         <div className="flex flex-col gap-3.5">
-          <div
-            className="rounded-[2px] border border-seam p-3"
-            style={{ backgroundColor: `color-mix(in srgb, ${verdict.color} 7%, transparent)` }}
-          >
-            <div className="flex items-center gap-1.5">
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ background: verdict.color }}
-              />
-              <span className="text-[11px] font-medium" style={{ color: verdict.color }}>
-                {verdict.label}
-              </span>
-            </div>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-text-secondary">
-              {read.verdictText}
-            </p>
+          <div className="flex flex-col gap-2.5 border-b border-seam pb-3.5">
+            <span className="text-sm font-medium" style={{ color: verdict.color }}>
+              {verdict.label}
+            </span>
+            <VerdictScale verdict={read.verdict} label={verdict.label} color={verdict.color} />
+            <p className="text-[12.5px] leading-relaxed text-text-secondary">{read.verdictText}</p>
           </div>
 
           <ReadSection title="ด้านเทคนิค" color="var(--ch-rsi)" lines={read.technical} />
@@ -225,5 +215,47 @@ function ReadSection({
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Three annunciator lamps, bearish to bullish. A mixed read lights both outer lamps (the
+ *  signals pull opposite ways); neutral lights only the middle one. */
+function VerdictScale({
+  verdict,
+  label,
+  color,
+}: {
+  verdict: AnalysisRead["verdict"];
+  label: string;
+  color: string;
+}) {
+  const lit = {
+    bearish: [true, false, false],
+    neutral: [false, true, false],
+    bullish: [false, false, true],
+    mixed: [true, false, true],
+  }[verdict];
+  const captions = ["ขาลง", "กลาง", "ขาขึ้น"];
+  return (
+    <div role="img" aria-label={`สัญญาณ: ${label}`} className="grid grid-cols-3 gap-1.5">
+      {captions.map((caption, i) => (
+        <div key={caption} className="flex flex-col gap-1">
+          <span
+            className="h-1.5 rounded-full"
+            style={
+              lit[i]
+                ? { background: color }
+                : { background: "var(--seam-bright)" }
+            }
+          />
+          <span
+            className="text-center text-[10px]"
+            style={{ color: lit[i] ? color : "var(--text-secondary)" }}
+          >
+            {caption}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }

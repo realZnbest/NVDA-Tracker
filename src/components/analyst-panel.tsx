@@ -123,11 +123,11 @@ function RatingBreakdown({
   price: number | null;
 }) {
   const segments: { key: string; count: number; color: string; label: string }[] = [
-    { key: "strongBuy", count: trend.strongBuy, color: "var(--up)", label: "ซื้อทันที" },
-    { key: "buy", count: trend.buy, color: "#7fd99a", label: "ซื้อ" },
-    { key: "hold", count: trend.hold, color: "var(--text-muted)", label: "ถือ" },
-    { key: "sell", count: trend.sell, color: "#e08a8a", label: "ขาย" },
-    { key: "strongSell", count: trend.strongSell, color: "var(--down)", label: "ขายทันที" },
+    { key: "strongBuy", count: trend.strongBuy, color: "#2fbf8a", label: "ซื้อทันที" },
+    { key: "buy", count: trend.buy, color: "#8cc560", label: "ซื้อ" },
+    { key: "hold", count: trend.hold, color: "#c9b458", label: "ถือ" },
+    { key: "sell", count: trend.sell, color: "#d9824f", label: "ขาย" },
+    { key: "strongSell", count: trend.strongSell, color: "#d1495b", label: "ขายทันที" },
   ];
   const total = segments.reduce((sum, segment) => sum + segment.count, 0);
   const consensus = consensusFromTrend(trend);
@@ -148,7 +148,7 @@ function RatingBreakdown({
       </div>
 
       {total > 0 && (
-        <div className="flex h-1.5 overflow-hidden rounded-full bg-panel-2">
+        <div className="flex h-2 gap-px overflow-hidden rounded-full bg-panel-2">
           {segments.map((segment) =>
             segment.count > 0 ? (
               <div
@@ -192,37 +192,108 @@ function RatingBreakdown({
 }
 
 function PriceTargetRows({ targets, price }: { targets: PriceTargets; price: number | null }) {
-  const rows = [
-    { key: "mean", label: "เป้าเฉลี่ย", value: targets.mean },
-    { key: "high", label: "เป้าสูงสุด", value: targets.high },
-    { key: "low", label: "เป้าต่ำสุด", value: targets.low },
+  // Scale covers the target range plus the current price, so a price that has run past the
+  // highest target (or sunk below the lowest) still lands on the bar.
+  const lo = Math.min(targets.low, price ?? targets.low);
+  const hi = Math.max(targets.high, price ?? targets.high);
+  const pad = (hi - lo) * 0.04 || 1;
+  const min = lo - pad;
+  const span = hi + pad - min;
+  const at = (v: number) => ((v - min) / span) * 100;
+
+  const upsideOf = (v: number) => (price ? ((v - price) / price) * 100 : null);
+  const meanUp = upsideOf(targets.mean);
+  // Price above the average target reads green, below it red — the bar segment, the headline
+  // and the average's % all share this one colour so they never disagree.
+  const meanColor = price !== null && price < targets.mean ? "var(--down)" : "var(--up)";
+
+  const stats = [
+    { key: "low", label: "ต่ำสุด", value: targets.low },
+    { key: "mean", label: "เฉลี่ย", value: targets.mean },
+    { key: "high", label: "สูงสุด", value: targets.high },
   ];
+
+  // Each stat block sits under its own tick: centred on it, or anchored by its edge near the
+  // ends so the block neither overflows the card nor drifts away from the tick.
+  const anchor = (v: number): React.CSSProperties => {
+    const x = at(v);
+    if (x < 12) return { left: `${x}%`, alignItems: "flex-start" };
+    if (x > 88) return { right: `${100 - x}%`, alignItems: "flex-end" };
+    return { left: `${x}%`, transform: "translateX(-50%)", alignItems: "center" };
+  };
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="module-label">ราคาเป้าหมาย</div>
-      {rows.map((row) => {
-        const upside = price ? ((row.value - price) / price) * 100 : null;
-        return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <span className="module-label">ราคาเป้าหมาย</span>
+        {meanUp !== null && (
+          <span className="telemetry text-[11px]" style={{ color: meanColor }}>
+            เฉลี่ย {meanUp >= 0 ? "+" : ""}
+            {meanUp.toFixed(1)}% จากราคาตอนนี้
+          </span>
+        )}
+      </div>
+
+      <div className="relative h-4">
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-seam" />
+        {price !== null && (
+          <div
+            className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
+            style={{
+              left: `${Math.min(at(price), at(targets.mean))}%`,
+              width: `${Math.abs(at(targets.mean) - at(price))}%`,
+              background: meanColor,
+              opacity: 0.55,
+            }}
+          />
+        )}
+        {[targets.low, targets.high].map((v) => (
           <span
-            key={row.key}
-            className="flex items-center justify-between gap-2 border-b border-seam/40 pb-1 text-[11px] text-text-secondary"
-          >
-            <span>{row.label}</span>
-            <span className="flex items-baseline gap-2">
-              <span className="telemetry text-text-primary">${row.value.toFixed(2)}</span>
+            key={v}
+            className="absolute top-1/2 h-2.5 w-px -translate-y-1/2 bg-text-muted"
+            style={{ left: `${at(v)}%` }}
+          />
+        ))}
+        <span
+          className="absolute top-1/2 h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-text-primary"
+          style={{ left: `${at(targets.mean)}%` }}
+        />
+        {price !== null && (
+          <span
+            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-panel bg-ch-nasdaq"
+            style={{ left: `${at(price)}%` }}
+          />
+        )}
+      </div>
+
+      <div className="relative h-[52px]">
+        {stats.map((stat) => {
+          const upside = upsideOf(stat.value);
+          return (
+            <div key={stat.key} className="absolute top-0 flex flex-col gap-0.5" style={anchor(stat.value)}>
+              <span className="text-[10px] text-text-muted">{stat.label}</span>
+              <span className="telemetry text-sm text-text-primary">${stat.value.toFixed(0)}</span>
               {upside !== null && (
                 <span
-                  className="telemetry w-14 text-right text-[10px]"
-                  style={{ color: upside >= 0 ? "var(--up)" : "var(--down)" }}
+                  className="telemetry text-[10px]"
+                  style={{
+                    color: stat.key === "mean" ? meanColor : upside >= 0 ? "var(--up)" : "var(--down)",
+                  }}
                 >
                   {upside >= 0 ? "+" : ""}
                   {upside.toFixed(1)}%
                 </span>
               )}
-            </span>
-          </span>
-        );
-      })}
+            </div>
+          );
+        })}
+      </div>
+      {price !== null && (
+        <span className="flex items-center gap-1.5 text-[10px] text-text-muted">
+          <span className="h-2 w-2 rounded-full bg-ch-nasdaq" />
+          ราคาตอนนี้ <span className="telemetry text-text-secondary">${price.toFixed(2)}</span>
+        </span>
+      )}
     </div>
   );
 }

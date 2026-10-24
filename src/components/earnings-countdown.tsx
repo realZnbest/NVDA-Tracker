@@ -20,6 +20,34 @@ const HOUR_LABEL_TH: Record<string, string> = {
 
 const DAY_MS = 24 * 60 * 60_000;
 
+/** One-day-ahead all-day reminder as an .ics download — works with any calendar app, no auth. */
+function downloadReminder(symbol: string, date: string) {
+  const compact = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
+  const day = new Date(`${date}T00:00:00Z`);
+  const before = new Date(day.getTime() - DAY_MS);
+  const after = new Date(before.getTime() + DAY_MS);
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//stock-tracker//earnings//EN",
+    "BEGIN:VEVENT",
+    `UID:${symbol}-${date}@stock-tracker`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
+    `DTSTART;VALUE=DATE:${compact(before)}`,
+    `DTEND;VALUE=DATE:${compact(after)}`,
+    `SUMMARY:พรุ่งนี้ ${symbol} ประกาศงบ`,
+    `DESCRIPTION:${symbol} รายงานผลประกอบการวันที่ ${date}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${symbol}-earnings-${date}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function countdownParts(targetDate: string, now: number): {
   today: boolean;
   days: number;
@@ -147,6 +175,14 @@ export function EarningsCountdown({
             })}
             {event.hour && HOUR_LABEL_TH[event.hour] && ` · ${HOUR_LABEL_TH[event.hour]}`}
           </p>
+
+          <button
+            onClick={() => downloadReminder(symbol, event.date)}
+            className="flex w-fit items-center gap-1.5 rounded bg-ch-price-dim px-2.5 py-1 text-[11px] text-ch-price hover:brightness-125 transition-[filter]"
+          >
+            <IconCalendar className="h-3 w-3" />
+            เตือนก่อนงบออก 1 วัน
+          </button>
 
           {event.epsEstimate !== null && (
             <div className="mt-1 flex items-center justify-between border-t border-seam pt-2">

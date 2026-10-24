@@ -81,6 +81,12 @@ export function PortfolioOverview() {
     router.push(`/portfolio/${result.symbol}`);
   }
 
+  // Weight is against rows with a live price; a row missing its quote shows "—" instead.
+  const totalValue = rows.reduce(
+    (sum, r) => sum + (r.price !== null ? r.aggregate.totalShares * r.price : 0),
+    0
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="module">
@@ -116,7 +122,7 @@ export function PortfolioOverview() {
         ) : (
           <ul>
             {rows.map((row) => (
-              <SymbolRowItem key={row.symbol} row={row} />
+              <SymbolRowItem key={row.symbol} row={row} totalValue={totalValue} />
             ))}
           </ul>
         )}
@@ -125,13 +131,14 @@ export function PortfolioOverview() {
   );
 }
 
-function SymbolRowItem({ row }: { row: SymbolRow }) {
+function SymbolRowItem({ row, totalValue }: { row: SymbolRow; totalValue: number }) {
   const { symbol, aggregate, price } = row;
   const value = price !== null ? aggregate.totalShares * price : null;
   const costBasis = aggregate.totalShares * aggregate.avgCost;
   const pnl = value !== null ? value - costBasis : null;
   const pnlPercent = pnl !== null && costBasis !== 0 ? (pnl / costBasis) * 100 : null;
   const up = pnl !== null && pnl >= 0;
+  const weight = value !== null && totalValue > 0 ? (value / totalValue) * 100 : null;
 
   return (
     <li className="border-b border-seam/60 last:border-b-0">
@@ -149,6 +156,10 @@ function SymbolRowItem({ row }: { row: SymbolRow }) {
           <div className="text-right">
             <p className="text-text-secondary text-[0.625rem]">มูลค่าปัจจุบัน</p>
             <p className="text-text-primary">{value !== null ? `$${value.toFixed(2)}` : "—"}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-text-secondary text-[0.625rem]">สัดส่วน</p>
+            <p className="text-text-primary">{weight !== null ? `${weight.toFixed(1)}%` : "—"}</p>
           </div>
           <div className="text-right min-w-[110px]">
             <p className="text-text-secondary text-[0.625rem]">กำไร/ขาดทุน</p>

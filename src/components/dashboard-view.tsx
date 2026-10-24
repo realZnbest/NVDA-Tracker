@@ -8,6 +8,7 @@ import { WatchlistRail } from "@/components/watchlist-rail";
 import { PriceChart } from "@/components/price-chart";
 import { AnalysisPanel } from "@/components/analysis-panel";
 import { AnalystPanel } from "@/components/analyst-panel";
+import { AlertsWidget } from "@/components/alerts-widget";
 import { EarningsCountdown } from "@/components/earnings-countdown";
 import { BenchmarkChart } from "@/components/benchmark-chart";
 import { ChatWidget } from "@/components/chat-widget";
@@ -21,13 +22,14 @@ function timeframeStorageKey(symbol: string): string {
 }
 
 type ChartView = "price" | "compare";
-type InspectorTab = "analysis" | "street" | "events";
+type InspectorTab = "analysis" | "street" | "events" | "alerts";
 type MobileTab = "chart" | "analysis";
 
 const INSPECTOR_TABS: { key: InspectorTab; label: string }[] = [
   { key: "analysis", label: "วิเคราะห์" },
   { key: "street", label: "นักวิเคราะห์" },
   { key: "events", label: "เหตุการณ์" },
+  { key: "alerts", label: "แจ้งเตือน" },
 ];
 
 const MOBILE_TABS: { key: MobileTab; label: string; icon: typeof IconWave }[] = [
@@ -186,6 +188,9 @@ export function DashboardView({ symbol = "NVDA" }: { symbol?: string }) {
             </div>
             <div hidden={inspectorTab !== "events"} role="tabpanel">
               <EarningsCountdown symbol={symbol} embedded />
+            </div>
+            <div hidden={inspectorTab !== "alerts"} role="tabpanel">
+              <AlertsWidget />
             </div>
           </div>
         </aside>

@@ -40,7 +40,11 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
   const [purchaseDate, setPurchaseDate] = useState("");
   const [shares, setShares] = useState("");
   const [pricePerShare, setPricePerShare] = useState("");
+  const [newNote, setNewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Why each lot was bought — kept in this browser only (localStorage), keyed by lot id.
+  // Write-once: set when the lot is added, never editable afterwards (it's a journal).
+  const [notes, setNotes] = usePersistentState<Record<string, string>>(`lot-notes:${symbol}`, {});
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
@@ -95,7 +99,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
     const parsedDate = parseDisplayDate(purchaseDate);
     if (!parsedDate || !shares || !pricePerShare) return;
     setSubmitting(true);
-    await fetch("/api/position", {
+    const res = await fetch("/api/position", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -105,8 +109,14 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
         pricePerShare: Number(pricePerShare),
       }),
     });
+    const created = (await res.json().catch(() => null)) as { lot?: PositionLot } | null;
+    if (created?.lot && newNote.trim()) {
+      const id = created.lot.id;
+      setNotes((prev) => ({ ...prev, [id]: newNote.trim() }));
+    }
     setShares("");
     setPricePerShare("");
+    setNewNote("");
     setSubmitting(false);
     refresh();
   }
@@ -157,7 +167,6 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
             color={metrics.unrealizedPnl >= 0 ? "var(--up)" : "var(--down)"}
           />
           </div>
-          <PositionNote symbol={symbol} />
         </div>
       )}
 
@@ -198,6 +207,16 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
             placeholder="เช่น 150.00"
             className="telemetry w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary sm:w-32"
             required
+          />
+        </div>
+        <div className="flex w-full min-w-0 flex-col gap-1.5">
+          <label className="module-label">เหตุผลที่ซื้อ (โน้ต)</label>
+          <input
+            type="text"
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="เช่น ซื้อก่อนประกาศงบ / ย่อมาเข้าแนวรับ"
+            className="w-full rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted"
           />
         </div>
         <button
@@ -269,7 +288,7 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
               ) : (
                 <li
                   key={lot.id}
-                  className="flex items-center justify-between gap-3 px-4 py-3 border-b border-seam/60 last:border-b-0"
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-seam/60 last:border-b-0"
                 >
                   <div className="min-w-0">
                     <p className="text-sm text-text-primary truncate">
@@ -313,6 +332,11 @@ export function PositionPanel({ symbol = "NVDA" }: { symbol?: string }) {
                       </>
                     )}
                   </div>
+                  {notes[lot.id] && (
+                    <p className="w-full whitespace-pre-wrap border-l-2 border-seam pl-2 text-[0.6875rem] text-text-secondary">
+                      {notes[lot.id]}
+                    </p>
+                  )}
                 </li>
               )
             )}
@@ -331,19 +355,5 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
         {value}
       </span>
     </div>
-  );
-}
-
-/** Private per-symbol note, kept in this browser only (localStorage) — never sent to the server. */
-function PositionNote({ symbol }: { symbol: string }) {
-  const [note, setNote] = usePersistentState(`position-note:${symbol}`, "");
-  return (
-    <textarea
-      value={note}
-      onChange={(e) => setNote(e.target.value)}
-      placeholder="โน้ตของฉัน (เก็บในเครื่องนี้เท่านั้น)"
-      rows={2}
-      className="w-full resize-none rounded border border-seam bg-panel-2 px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted"
-    />
   );
 }
