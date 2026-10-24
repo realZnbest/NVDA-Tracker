@@ -24,6 +24,7 @@ colors:
   ch-alert-dim: "#5c2222"
   up: "#34d17c"
   down: "#ef5b5b"
+  session-extended: "#e3a94b"
 typography:
   display:
     fontFamily: "IBM Plex Mono, ui-monospace, monospace"
@@ -42,6 +43,16 @@ typography:
     fontWeight: 500
     lineHeight: 1.4
     letterSpacing: "0.14em"
+  telemetry:
+    fontFamily: "IBM Plex Mono, ui-monospace, monospace"
+    fontSize: "0.6875rem"
+    fontWeight: 500
+    lineHeight: 1.4
+  micro:
+    fontFamily: "IBM Plex Mono, ui-monospace, monospace"
+    fontSize: "0.5625rem"
+    fontWeight: 500
+    lineHeight: 1.2
 rounded:
   sm: "3px"
   pill: "9999px"
@@ -97,6 +108,7 @@ Ground colors sit within a few steps of near-black; every hue that appears above
 
 ### Tertiary
 - **Annunciator Red** (`#ef4a4a`, token `ch-alert`): reserved for alert state only — lit alert lamps, the notification badge, the delete-alert hover state. Never used for anything that is not an alert or a destructive action, so it keeps its alarm meaning.
+- **Session Amber** (`#e3a94b`, frontmatter `session-extended`): pre/post-market only — the shared PRE/AH session badge and the quote header's extended-hours wash. It is a market-state color, not a data channel: price moves always stay `up`/`down`, never amber.
 
 ### Neutral
 - **Graphite Ground** (`#0a0c0f`, token `bg`): page background.
@@ -126,6 +138,7 @@ Ground colors sit within a few steps of near-black; every hue that appears above
 - **Title** (500, 0.875rem / `text-sm`): module content headers, nav labels, news headlines.
 - **Body** (400, 0.75–0.875rem / `text-xs`–`text-sm`, 1.6 line-height): analysis prose, news summaries, table cells.
 - **Label** (500, 0.625–0.6875rem / `text-[10px]`–`text-[11px]`, 0.14em tracking, uppercase, mono): the `.module-label` silkscreen legend at the top of every module ("บทวิเคราะห์สังเคราะห์", "รายได้รายไตรมาส"), annunciator lamp captions ("PRICE", "RSI").
+- **Micro** (500, 0.5625rem / `text-[9px]`, mono): session badges and the smallest treemap labels. Used only where a fixed-width instrument caption has to survive inside a measured box; never for prose or standalone body copy.
 
 ### Named Rules
 **The Measurement-Only Mono Rule.** Monospace type appears only where a number is a live measurement or a fixed-width instrument label needs it (module legends, telemetry digits, timestamps). It is never applied to Thai prose or headings for a "technical" look — that would be costume, not function.
@@ -137,6 +150,8 @@ The dashboard is a full-bleed cockpit: no `max-width` cap and only an 8px outer 
 Financials uses a `2 / 4` responsive grid of ratio cards and trend-bar modules that collapses to 2 then 1 columns. News and Alerts constrain to `max-w-3xl` — narrower, reading-oriented columns instead of the dashboard's instrument-wall width.
 
 The top chrome is one sticky module-tab nav (`px-2`, `py-3` targets, 2px `ch-price` underline on the active tab) over a blurred raised-deck background. Symbol search and the notification bell sit at the right. On narrow viewports the nav scrolls horizontally (`overflow-x-auto`) rather than wrapping tab labels onto a second line, which would break Thai compound words mid-word.
+
+The heatmap stays a single scrolling page rather than the locked cockpit: it uses the standard page container so the wall is framed by the page gutter. On `lg+` the primary sector overview uses `clamp(500px, calc(100dvh - 18rem), 820px)`, and the secondary stock detail keeps `clamp(520px, calc(100dvh - 17rem), 860px)`; both are tall enough to behave like a wall, bounded so the legend and footer do not fall below the fold on a laptop. Below `lg` the sector table and the stock list set their own height and the page scrolls normally.
 
 ### Mobile App Shell
 Below `lg` the dashboard stops being a stacked desktop page and becomes a stock-app-style detail screen: the global rack nav is the top app bar, followed by a compact quote header, one full-height panel, and a four-item bottom tab bar (`กราฟ` / `วิเคราะห์` / `รายการ` / `AI`). The chart is the default tab and fills everything between the quote header and the bottom bar — the shell is exactly `calc(100dvh - 47px)` below the nav, and the chart section is the `flex-1` child, so it reads as a native full-screen chart rather than a card below the watchlist.
@@ -202,6 +217,19 @@ Market state read as ambient color rather than a discrete badge, so it survives 
 ### Cockpit Rails
 The left rail (`180px`) lists the owner's watchlist with logo, symbol, price and change; signed-out visitors see the public market board (`SPY` / `QQQ` / `DIA` / `IWM`), and the owner gets a dashed `เพิ่มหุ้น` action row. It is vertical at every width: on desktop it is the left cockpit rail, and below `lg` the same component becomes the full-height `รายการ` tab instead of a horizontal strip under the chart. The right inspector (`290px`) holds three tabs — `วิเคราะห์` / `นักวิเคราะห์` / `เหตุการณ์` — with all panels mounted and hidden so switching tabs never refetches; below `lg` it becomes the full-height `วิเคราะห์` tab. Both rails scroll independently; on desktop the inspector's scroll area reserves `pb-14` for the floating chat trigger, while mobile reaches the chat through the bottom `AI` tab.
 
+### Market Heatmap
+`/heatmap` is sector-first. The primary rack module is the eleven-industry ICB overview; the fixed 36-stock board is a secondary disclosure below it, opened by the disclosure row or by clicking a sector. Both are full-width rack modules, not a card grid.
+
+The sector overview is a single-level squarified treemap at `lg+`: one block per Russell 1000 ICB industry, represented by its iShares U.S. sector ETF. Area is the industry's approximate Russell 1000 ICB weight from `heatmap-universe.ts` (a fixed classification table, not a live measurement); colour is the ETF's daily % change. There is no 2.5% floor here because the smallest real industry weight (Basic Materials, ~1.6%) is already large enough at laptop width. The scale is symmetric and capped at 1.5–3%; the legend prints the exact ± bound, and an outlier clips as stated. Labels appear progressively — sector name, ETF ticker, percentage, and market weight — with the type stepping up from 10px micro to `text-base` on the largest blocks and the percentage to `text-3xl`; a field is hidden at that size rather than clipped. A sector block is a button: clicking it opens the stock detail filtered to that sector. The toolbar carries the `SECTOR MAP` silkscreen label, the shared session badge, the 11-industry count, the legend, the as-of time, and a manual refresh. ICB puts Alphabet/Meta in Technology, media/entertainment in Consumer Discretionary, communications equipment in Telecommunications, and payment processors in Industrials; there is no Communication Services tile.
+
+The stock detail is the existing two-level squarified treemap at `lg+`, now labelled `STOCK DETAIL`: sector blocks sized by total market cap and companies inside each block sized by their own cap. Sector weight carries a 2.5% floor so the smallest sector still gets a readable block; intra-sector weights stay raw, so the floor never distorts the company split. Sector headers are silkscreen captions — full Thai names on wide blocks, `ยูทิลิตี้` / `อสังหาฯ` on tight ones — with the sector's cap-weighted change at the right; the full name remains in the section's `aria-label` and the label's `title`. The header states the visible count and, when filtered, the sector name plus a `ดูทุกกลุ่ม` action; the unfiltered state says `36 หุ้นใหญ่ · ตัวอย่าง`. The disclosure row above it says the stock sample is not a market representative. The sample follows ICB assignments (Alphabet/Meta in Technology, Netflix in Consumer Discretionary, Visa/Mastercard in Industrials) and includes Verizon/AT&T/Cisco so Telecommunications has a drill-down.
+
+Tile fill is the day's direction mixed into `panel-2`: `up` green above zero, `down` red below, flat at `panel-2` itself, and a dashed muted tile when the quote is missing. The stock detail's scale is symmetric and capped at the 2–6% bound the day requires; the sector overview's is capped at 1.5–3%. Both legends always print the exact ± bound, so a violent day clips as stated instead of silently washing out. The sign is printed in every percentage, so direction never depends on colour alone. Labels appear progressively as the box grows — in the stock detail, ticker down to a 24px sliver, percentage from 56px wide, company name from 110px, price from 94px, with type from 9px micro to `text-lg` on the largest tiles. A field is hidden at that size rather than clipped; a truncated `−0.9…` is not a readout.
+
+The strip between toolbar and map follows the same instrument-readout pattern. In the sector overview it reports sector breadth (advancers, decliners, flat, missing), the sector-weight-weighted average, and the leader/laggard; hovering or focusing a sector replaces it with that sector's ETF, price in USD, change, and market weight. In the stock detail it reports the visible stock breadth, the cap-weighted average, and the leader/laggard; hovering or focusing a tile replaces it with that ticker's name, price in USD, change, market cap, and sector. Stock tiles link to `/dashboard/[symbol]` with prefetch off, so sweeping the wall doesn't fan out 36 navigations, and focus/blur drive the same readout as the pointer.
+
+Below `lg` the sector treemap becomes a compact weight table: one row per sector, with the ETF, Thai name, a proportional weight bar, the exact weight, and the signed change. The stock treemap becomes the existing sector-grouped proportional list: each company keeps a width share of its row proportional to market cap (minimum 68px) but rows stay a fixed 56px tall, so tickers and percentages remain legible instead of shrinking into the mosaic; sector headers repeat the full label, company count, and cap-weighted change. Both mobile views use the same colour scales and detailed Thai `aria-label`s; the progressive multi-field label is a desktop-only affordance.
+
 ### Price Instrument Panel (signature component)
 The centerpiece: a single `lightweight-charts` instance split into four native panes (price+overlays, volume, RSI, MACD) inside one module, so panning/zooming/crosshair stay synchronized across all four the way linked instrument channels would. Each pane's series use its channel's exact color; the candlestick pane's price scale is trimmed to a tight top/bottom margin (`0.08` / `0.02`) so candles fill their pane rather than floating in a mostly-empty scale, keeping the boundary between panes legible. Desktop pane stretch factors are `7 / 0.9 / 1.05 / 1.05`; the compact mobile chart uses `8 / 0.8 / 0.95 / 0.95`, giving the candles an even larger share of the full-height canvas while volume/RSI/MACD stay readable subordinate strips. The default 1H window is width-aware: desktop opens on 20 days and widens toward 28 days on large cockpits, targeting ~9px bars; compact viewports start at 5 days and use the same width target, so a phone never squeezes ~100 candles into ~340px. Range tabs keep their semantic window (1D is one day, 1M one month), and analysis/compare views keep the fixed 20-day 1H scope. Two bars of padding at each edge keep the first/last time labels from clipping, and support/resistance levels outside the visible price range are not drawn so their labels cannot pin to the time axis.
 
@@ -213,6 +241,9 @@ The centerpiece: a single `lightweight-charts` instance split into four native p
 - **Do** render live measurements in IBM Plex Mono with `tabular-nums`; render Thai UI copy in IBM Plex Sans Thai.
 - **Do** write every error/empty state as a specific Thai sentence naming the problem and the recovery (e.g. missing API key names the env var and the fix), never a generic "something went wrong."
 - **Do** let the nav scroll horizontally on narrow viewports rather than wrapping Thai labels onto a second line.
+- **Do** keep the heatmap legend honest — print the exact ± bound in use and keep the sign on every percentage, so direction never relies on colour alone.
+- **Do** hide a heatmap label field when its tile is too small for it; a clipped number is worse than an absent one.
+- **Do** label the 36-stock detail as a sample, not a market representative; the sector overview is the market claim, and the stock board is a drill-down.
 
 ### Don't:
 - **Don't** introduce a same-size icon+heading+text card grid anywhere; it is the category default this system explicitly refuses.
@@ -220,3 +251,4 @@ The centerpiece: a single `lightweight-charts` instance split into four native p
 - **Don't** add a drop-shadow "lift" to a module; depth comes from the inset recess treatment only.
 - **Don't** use monospace type for Thai prose, headings, or body copy — mono is reserved for measurements and instrument labels.
 - **Don't** fabricate real price, financial, or news data anywhere in the shipped product; every number comes from the live Finnhub response or the UI shows an honest loading/empty/error state.
+- **Don't** shrink either desktop treemap into the phone layout or give every tile an equal area — the sector map's area must keep encoding approximate market weight, and the stock detail's area must keep encoding market cap; the compact views use proportional lists for legibility.

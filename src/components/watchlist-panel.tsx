@@ -11,6 +11,7 @@ import {
 import { usePoll } from "@/lib/use-poll";
 import { useAlertsContext } from "./alerts-provider";
 import { AlertsPasswordGate } from "./alerts-password-gate";
+import { SessionBadge } from "./session-badge";
 import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 import {
   IconArrowDown,
@@ -27,36 +28,6 @@ const PREVIEW_LIMIT = 6;
 const QUOTE_REFRESH_LIVE_MS = 5_000;
 const QUOTE_REFRESH_IDLE_MS = 60_000;
 const MARKET_REFRESH_MS = 5 * 60_000;
-
-const SESSION_BADGE: Record<
-  WatchlistMarket["session"],
-  { label: string; color: string; pulse: boolean; title: string }
-> = {
-  regular: {
-    label: "LIVE",
-    color: "var(--up)",
-    pulse: true,
-    title: "ตลาดเปิด — ราคาอัปเดตทุก 5 วินาทีเมื่อสตรีมพร้อม",
-  },
-  pre: {
-    label: "PRE",
-    color: "#e3a94b",
-    pulse: false,
-    title: "ก่อนตลาดเปิด — ราคาอัปเดตทุก 5 วินาทีเมื่อสตรีมพร้อม",
-  },
-  post: {
-    label: "AH",
-    color: "#e3a94b",
-    pulse: false,
-    title: "หลังตลาดปิด — ราคาอัปเดตทุก 5 วินาทีเมื่อสตรีมพร้อม",
-  },
-  closed: {
-    label: "CLOSED",
-    color: "var(--text-muted)",
-    pulse: false,
-    title: "ตลาดปิด — ราคาอัปเดตทุก 60 วินาที",
-  },
-};
 
 interface WatchlistPanelProps {
   variant?: "full" | "preview";
@@ -522,27 +493,7 @@ export function WatchlistPanel({ variant = "full", className }: WatchlistPanelPr
         <>
           <div className="flex items-baseline justify-between gap-3 border-b border-seam px-4 pb-2.5 sm:px-5">
             <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[0.6875rem] text-text-muted">
-              {session && (
-                <span
-                  title={SESSION_BADGE[session].title}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[0.5625rem] font-semibold tracking-[0.08em]"
-                  style={{
-                    color: SESSION_BADGE[session].color,
-                    backgroundColor: `color-mix(in srgb, ${SESSION_BADGE[session].color} 14%, transparent)`,
-                  }}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`h-1 w-1 rounded-full ${
-                      SESSION_BADGE[session].pulse
-                        ? "animate-[lit-pulse_2s_ease-in-out_infinite]"
-                        : ""
-                    }`}
-                    style={{ backgroundColor: SESSION_BADGE[session].color }}
-                  />
-                  {SESSION_BADGE[session].label}
-                </span>
-              )}
+              <SessionBadge session={session} />
               <span className="truncate">
                 {loading ? "…" : `${items.length} รายการ`}
                 {!preview && updatedLabel ? ` · อัปเดต ${updatedLabel}` : ""}

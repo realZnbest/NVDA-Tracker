@@ -1,11 +1,19 @@
 import type { FinnhubCandles } from "./finnhub";
-import type { WatchlistMarket } from "./types";
+import type { MarketSession, WatchlistMarket } from "./types";
+
+export type { MarketSession } from "./types";
 
 interface YahooMeta {
   regularMarketPrice: number;
+  regularMarketChangePercent?: number;
+  regularMarketTime?: number;
+  regularMarketDayHigh?: number;
+  regularMarketDayLow?: number;
+  regularMarketVolume?: number;
   shortName?: string;
   longName?: string;
   exchangeName?: string;
+  fullExchangeName?: string;
   previousClose?: number;
   chartPreviousClose?: number;
   preMarketPrice?: number;
@@ -39,8 +47,6 @@ interface YahooChartResponse {
     error: { code: string; description: string } | null;
   };
 }
-
-export type MarketSession = "pre" | "regular" | "post" | "closed";
 
 export interface ExtendedHoursQuote {
   session: MarketSession;
@@ -247,6 +253,89 @@ export async function getWatchlistMarket(symbol: string): Promise<WatchlistMarke
   const result: WatchlistMarket = { session, pre, post, sparkline };
   watchlistCache.set(symbol, { expires: Date.now() + 5 * 60_000, data: result });
   return result;
+}
+
+export interface YahooMarketSnapshot {
+  price: number;
+  change: number | null;
+  changePercent: number | null;
+  previousClose: number | null;
+  dayHigh: number | null;
+  dayLow: number | null;
+  volume: number | null;
+  name: string | null;
+  exchangeName: string | null;
+  session: MarketSession;
+  /** Unix seconds of the last regular-session print. */
+  time: number | null;
+}
+
+const marketSnapshotCache = new Map<
+  string,
+  { expires: number; data: YahooMarketSnapshot }
+>();
+
+/**
+ * A compact one-request snapshot for the market heatmap: price, day change and the
+ * session state. The chart endpoint is the same unauthenticated Yahoo source the
+ * candles use, which keeps the heatmap's 36-symbol refresh off the Finnhub quote
+ * quota entirely (market caps still come from Finnhub's profile endpoint, cached a
+ * day). The longer cache while shut matches the fact that the number cannot move.
+ */
+export async function getYahooMarketSnapshot(symbol: string): Promise<YahooMarketSnapshot> {
+  const hit = marketSnapshotCache.get(symbol);
+  if (hit && hit.expires > Date.now()) return hit.data;
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok) throw new Error(`YAHOO_HTTP_${res.status}`);
+  const data = (await res.json()) as YahooChartResponse;
+  const meta = data.chart.result?.[0]?.meta;
+  if (!meta || !Number.isFinite(meta.regularMarketPrice) || meta.regularMarketPrice <= 0) {
+    throw new Error("YAHOO_NO_DATA");
+  }
+
+  const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? null;
+  const changePercent =
+    typeof meta.regularMarketChangePercent === "number" &&
+    Number.isFinite(meta.regularMarketChangePercent)
+      ? meta.regularMarketChangePercent
+      : previousClose !== null && previousClose > 0
+        ? ((meta.regularMarketPrice - previousClose) / previousClose) * 100
+        : null;
+  const session = computeSession(meta.currentTradingPeriod);
+
+  const snapshot: YahooMarketSnapshot = {
+    price: meta.regularMarketPrice,
+    change: previousClose !== null ? meta.regularMarketPrice - previousClose : null,
+    changePercent,
+    previousClose,
+    dayHigh: Number.isFinite(meta.regularMarketDayHigh)
+      ? (meta.regularMarketDayHigh as number)
+      : null,
+    dayLow: Number.isFinite(meta.regularMarketDayLow)
+      ? (meta.regularMarketDayLow as number)
+      : null,
+    volume: Number.isFinite(meta.regularMarketVolume)
+      ? (meta.regularMarketVolume as number)
+      : null,
+    name: meta.longName ?? meta.shortName ?? null,
+    exchangeName: meta.fullExchangeName ?? meta.exchangeName ?? null,
+    session,
+    time: Number.isFinite(meta.regularMarketTime)
+      ? (meta.regularMarketTime as number)
+      : null,
+  };
+
+  marketSnapshotCache.set(symbol, {
+    expires: Date.now() + (session === "closed" ? 5 * 60_000 : 45_000),
+    data: snapshot,
+  });
+  return snapshot;
 }
 
 /**

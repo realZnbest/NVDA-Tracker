@@ -161,3 +161,39 @@ export function IconInfo({ className }: IconProps) {
     </svg>
   );
 }
+
+export function IconGrid({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="3" y="3" width="8" height="8" rx="0.5" />
+      <rect x="13" y="3" width="8" height="5" rx="0.5" />
+      <rect x="13" y="10" width="8" height="11" rx="0.5" />
+      <rect x="3" y="13" width="8" height="8" rx="0.5" />
+    </svg>
+  );
+}
+
+export function IconRefresh({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  );
+}
+
+export function IconExpand({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M9 4H4v5M15 4h5v5M20 15v5h-5M4 15v5h5" />
+    </svg>
+  );
+}
+
+export function IconCollapse({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 9h5V4M20 9h-5V4M15 20v-5h5M9 20v-5H4" />
+    </svg>
+  );
+}

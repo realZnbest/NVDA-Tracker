@@ -25,6 +25,12 @@ function getFinnhubKeys(): string[] {
   ].filter((k): k is string => Boolean(k));
 }
 
+/** Lets a public surface (the market heatmap) skip profile calls entirely instead of
+ *  burning through 36 predictable MISSING_API_KEY failures on every request. */
+export function isFinnhubConfigured(): boolean {
+  return getFinnhubKeys().length > 0;
+}
+
 async function fetchFinnhub<T>(
   path: string,
   params: Record<string, string | number>,
@@ -105,6 +111,19 @@ export interface FinnhubBasicFinancials {
   series?: unknown;
 }
 
+export interface FinnhubCompanyProfile {
+  ticker?: string;
+  name?: string;
+  country?: string;
+  currency?: string;
+  exchange?: string;
+  finnhubIndustry?: string;
+  /** In millions of the profile currency — multiply by 1e6 for whole dollars. */
+  marketCapitalization?: number;
+  shareOutstanding?: number;
+  logo?: string;
+}
+
 export interface FinnhubReportedFinancials {
   data: Array<{
     year: number;
@@ -179,6 +198,20 @@ export function getBasicFinancials(symbol: string) {
     "/stock/metric",
     { symbol, metric: "all" },
     60 * 60_000
+  );
+}
+
+/**
+ * Company profile is the free-tier source for market capitalisation (the paid-only
+ * endpoints don't matter here). Cached for a day: caps drift with price, but the map
+ * only needs a stable relative size, and re-fetching 36 profiles every minute would
+ * spend the whole Finnhub quota on data that barely moves.
+ */
+export function getCompanyProfile(symbol: string) {
+  return fetchFinnhub<FinnhubCompanyProfile>(
+    "/stock/profile2",
+    { symbol },
+    24 * 60 * 60_000
   );
 }
 
