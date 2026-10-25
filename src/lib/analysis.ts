@@ -3,7 +3,7 @@ import { mapWithConcurrency } from "./concurrency";
 import { HEATMAP_UNIVERSE, sectorLabel } from "./heatmap-universe";
 import { getYahooCandles } from "./yahoo";
 import { SYMBOL, TIMEFRAMES, type TimeframeKey } from "./timeframes";
-import { atr, bollinger, lastValid, macd, rsi, sma, weeklyCloses } from "./indicators";
+import { atr, bollinger, ema, lastValid, macd, rsi, sma, weeklyCloses } from "./indicators";
 import type { FinnhubCandles } from "./finnhub";
 
 export class AnalysisDataError extends Error {}
@@ -25,6 +25,10 @@ export interface TechnicalInputs {
   volumeRatio?: number | null;
   /** Latest daily close vs the previous close, in %. Gives the volume read a direction. */
   lastDayChangePct?: number | null;
+  /** EMA20 / EMA50 of the timeframe being viewed (intraday tabs only — on daily bars the MA
+   *  stack already covers this). Lets the read see the trend the chart is actually showing. */
+  tfEmaFast?: number | null;
+  tfEmaSlow?: number | null;
   /** 14-day ATR as a % of price — how far the stock typically travels in a day. */
   atrPct?: number | null;
   /** Trend of the weekly closes (price vs 10- and 30-week averages), for a multi-timeframe check. */
@@ -79,8 +83,6 @@ interface SideRead {
 const CONFLICT_MIN = 0.5;
 /** Daily ATR above this share of price is flagged as high volatility (a warning line only). */
 const HIGH_VOLATILITY_ATR_PCT = 4;
-/** Both sides must lean at least this far, in opposite directions, to call a read "mixed". */
-const MIXED_MIN = 1;
 
 function pct(n: number) {
   return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
@@ -160,6 +162,14 @@ export function buildTechnicalRead(
       note(`MACD (${timeframeLabel}) อยู่ใต้เส้นสัญญาณและช่องว่างกว้างขึ้น — แรงกดดันขาลงกำลังเพิ่มขึ้น`, -1);
     } else {
       note(`MACD (${timeframeLabel}) อยู่ใต้เส้นสัญญาณแต่ช่องว่างเริ่มแคบลง — แรงขายเริ่มอ่อนแรง อาจใกล้กลับตัว`, -0.3);
+    }
+  }
+
+  if (input.tfEmaFast != null && input.tfEmaSlow != null) {
+    if (input.price < input.tfEmaFast && input.tfEmaFast < input.tfEmaSlow) {
+      note(`ราคาอยู่ใต้ EMA20 และ EMA50 ของกรอบ ${timeframeLabel} — แนวโน้มระยะสั้นเป็นขาลง`, -1);
+    } else if (input.price > input.tfEmaFast && input.tfEmaFast > input.tfEmaSlow) {
+      note(`ราคาอยู่เหนือ EMA20 และ EMA50 ของกรอบ ${timeframeLabel} — แนวโน้มระยะสั้นเป็นขาขึ้น`, 1);
     }
   }
 
@@ -368,12 +378,14 @@ export function synthesize(
   const fund = buildFundamentalRead(fundamental);
   const total = tech.score + fund.score;
 
-  // Opposite signs alone are not a disagreement worth reporting: +0.3 against -0.2 is two
-  // faint readings, not two camps. Each side has to lean past a floor to count.
+  // Opposite signs alone are not a disagreement: +0.3 against -0.2 is two faint readings,
+  // not two camps, so each side has to lean past a floor to count. Past that floor any
+  // disagreement is "mixed" — strong fundamentals must not turn a falling chart into a
+  // bullish headline just because they outscore it.
   const opposed = Math.sign(tech.score) * Math.sign(fund.score) < 0;
   const conflicting =
     opposed && Math.abs(tech.score) >= CONFLICT_MIN && Math.abs(fund.score) >= CONFLICT_MIN;
-  const mixed = conflicting && Math.abs(tech.score) >= MIXED_MIN && Math.abs(fund.score) >= MIXED_MIN;
+  const mixed = conflicting;
 
   const conflicts: string[] = [];
   if (conflicting) {
@@ -567,6 +579,7 @@ export async function getAnalysisRead(
 
   const rsiSeries = rsi(tfCandles.c, 14);
   const macdSeries = macd(tfCandles.c);
+  const intraday = tf.yahooInterval.endsWith("m");
 
   const dailyCloses = dailyCandles.c;
   const ma20 = sma(dailyCloses, 20);
@@ -590,6 +603,8 @@ export async function getAnalysisRead(
       ma200: lastValid(ma200),
       bollingerUpper: lastValid(bb.upper),
       bollingerLower: lastValid(bb.lower),
+      tfEmaFast: intraday ? lastValid(ema(tfCandles.c, 20)) : null,
+      tfEmaSlow: intraday ? lastValid(ema(tfCandles.c, 50)) : null,
       ...deriveDailyContext(dailyCandles, price),
     },
     {
