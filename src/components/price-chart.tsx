@@ -27,11 +27,12 @@ import {
   rsi,
   sma,
 } from "@/lib/indicators";
-import type { FinnhubCandles } from "@/lib/finnhub";
+import type { FinnhubCandles, FinnhubQuote } from "@/lib/finnhub";
 import { computeAggregatePosition } from "@/lib/position";
 import { usePersistentState } from "@/lib/use-persistent-state";
 import { usePoll } from "@/lib/use-poll";
 import { useAlertsContext } from "./alerts-provider";
+import { useLiveQuote } from "./live-quote-provider";
 import { IconSliders } from "./icons";
 
 const CH = {
@@ -94,9 +95,17 @@ const DEFAULT_LAYERS: Layers = {
   structure: true,
 };
 
-/** Candles are re-pulled on this cadence while the tab is visible, so an open dashboard
- *  keeps tracking the live bar instead of freezing at whatever it loaded on arrival. */
-const REFRESH_INTERVAL_MS = 60_000;
+/** Full candle re-pulls correct OHLC/volume; the live trade overlay below keeps the
+ *  last bar's price moving between these fetches. One minute while a session is
+ *  trading is enough for the base data, and five minutes when shut costs almost
+ *  nothing because the price cannot move. */
+const LIVE_REFRESH_INTERVAL_MS = 60_000;
+const CLOSED_REFRESH_INTERVAL_MS = 5 * 60_000;
+
+/** The regular US session is 6.5 hours. A daily Yahoo bar is stamped at the open,
+ *  so this is the window in which a live trade still belongs to that bar; a wider
+ *  window would let after-hours prints leak into the daily candle. */
+const REGULAR_SESSION_SECONDS = 6.5 * 60 * 60;
 
 /** Target spacing for the default 1H view: on wide cockpits add bars instead of fattening them. */
 const TARGET_1H_BAR_SPACING = 9;
@@ -162,6 +171,59 @@ function defaultVisibleBars(
   );
 }
 
+/**
+ * Width of the time bucket the last candle occupies, used to decide whether the
+ * latest trade still belongs to that candle. Intraday bars use their own interval;
+ * a daily bar uses the 6.5h regular session; weekly bars are left alone because
+ * Yahoo stamps them at the week's first open but the last print lands days later.
+ */
+function liveBarWindowSeconds(timeframe: TimeframeKey): number {
+  const tf = TIMEFRAMES.find((t) => t.key === timeframe);
+  const interval = tf?.yahooInterval ?? "";
+  if (interval.endsWith("m")) return Number(interval) * 60;
+  if (interval.endsWith("h")) return Number(interval) * 3600;
+  if (interval === "1d") return REGULAR_SESSION_SECONDS;
+  return 0;
+}
+
+interface LiveBar {
+  index: number;
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+/**
+ * The last candle with the live trade print folded in, or null when the print is
+ * outside that candle's bucket (e.g. after-hours, a weekend, or a just-rolled bar).
+ * Keeping this decision in one place lets the candle series and the readout agree.
+ */
+function liveBarFor(
+  candles: FinnhubCandles | null,
+  quote: FinnhubQuote | null,
+  timeframe: TimeframeKey
+): LiveBar | null {
+  if (!candles || !quote || candles.t.length === 0) return null;
+  if (!Number.isFinite(quote.c) || quote.c <= 0) return null;
+  const windowSeconds = liveBarWindowSeconds(timeframe);
+  if (windowSeconds === 0) return null;
+
+  const index = candles.t.length - 1;
+  const barTime = candles.t[index];
+  if (quote.t < barTime || quote.t >= barTime + windowSeconds) return null;
+
+  return {
+    index,
+    time: barTime,
+    open: candles.o[index],
+    high: Math.max(candles.h[index], quote.c),
+    low: Math.min(candles.l[index], quote.c),
+    close: quote.c,
+  };
+}
+
 interface PriceChartProps {
   symbol?: string;
   timeframe: TimeframeKey;
@@ -171,14 +233,19 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick" | "Line" | "Histogram">>>({});
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
   const srLinesRef = useRef<IPriceLine[]>([]);
   const breakEvenLineRef = useRef<IPriceLine | null>(null);
   /** Timeframe whose default view has already been applied — see the scoping effect. */
   const scopedRef = useRef<TimeframeKey | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  /** Monotonic id for candle requests: a response only lands if it is still the newest. */
+  const candleRequestRef = useRef(0);
+  const candleAbortRef = useRef<AbortController | null>(null);
 
   const { authStatus } = useAlertsContext();
+  const { quote, extended } = useLiveQuote();
   const [avgCost, setAvgCost] = useState<number | null>(null);
 
   const [candles, setCandles] = useState<FinnhubCandles | null>(null);
@@ -236,14 +303,25 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
   // A timeframe switch is a visible load; the periodic refresh below is silent — it must
   // not flash the "กำลังโหลด" overlay over a chart the owner is already reading, and a
   // transient network blip on refresh shouldn't blank out good data either.
+  //
+  // Every call aborts the previous request and carries a monotonic id, so a slow
+  // response from the timeframe the owner just left can never land on top of the new one.
   const loadCandles = useCallback(
     (mode: "initial" | "refresh") => {
-      const cancelledRef = { current: false };
+      const id = ++candleRequestRef.current;
+      candleAbortRef.current?.abort();
+      const controller = new AbortController();
+      candleAbortRef.current = controller;
+
       if (mode === "initial") setStatus("loading");
-      fetch(`/api/candles?tf=${timeframe}&symbol=${symbol}`)
+
+      return fetch(`/api/candles?tf=${timeframe}&symbol=${symbol}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      })
         .then((r) => r.json())
         .then((data) => {
-          if (cancelledRef.current) return;
+          if (id !== candleRequestRef.current) return;
           if (data.error === "MISSING_API_KEY") {
             if (mode === "initial") setStatus("no_key");
             return;
@@ -256,22 +334,30 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
           setCandlesTimeframe(timeframe);
           setStatus("ready");
         })
-        .catch(() => {
-          if (!cancelledRef.current && mode === "initial") setStatus("error");
+        .catch((err) => {
+          if ((err as Error).name === "AbortError") return;
+          if (id !== candleRequestRef.current) return;
+          if (mode === "initial") setStatus("error");
         });
-      return () => {
-        cancelledRef.current = true;
-      };
     },
     [timeframe, symbol]
   );
 
-  useEffect(() => loadCandles("initial"), [loadCandles]);
-
-  const refresh = useCallback(() => {
-    loadCandles("refresh");
+  useEffect(() => {
+    void loadCandles("initial");
+    return () => candleAbortRef.current?.abort();
   }, [loadCandles]);
-  usePoll(refresh, REFRESH_INTERVAL_MS, { leading: false });
+
+  const refresh = useCallback(() => loadCandles("refresh"), [loadCandles]);
+  // The live trade overlay below keeps the last bar's price current between these
+  // fetches, so the slower closed-market cadence costs no visible freshness while
+  // cutting Yahoo chart traffic 5x overnight.
+  const candleRefreshMs =
+    extended?.session === "closed" ? CLOSED_REFRESH_INTERVAL_MS : LIVE_REFRESH_INTERVAL_MS;
+  usePoll(refresh, candleRefreshMs, {
+    leading: false,
+    enabled: status !== "loading",
+  });
 
   const computed = useMemo(() => {
     if (!candles) return null;
@@ -320,6 +406,15 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
     };
   }, [candles, params, timeframe]);
 
+  // Only fold a live print into candles belonging to the selected timeframe. During a
+  // switch the previous timeframe's candles can still be in state while the new fetch
+  // is in flight; overlaying into those would paint a live price onto the wrong bar.
+  const liveBar = useMemo(
+    () =>
+      candlesTimeframe === timeframe ? liveBarFor(candles, quote, timeframe) : null,
+    [candles, candlesTimeframe, timeframe, quote]
+  );
+
   // create chart once
   useEffect(() => {
     if (!containerRef.current) return;
@@ -357,6 +452,7 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
       },
       0
     );
+    candleSeriesRef.current = candleSeries;
     candleSeries.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.02 } });
     markersPluginRef.current = createSeriesMarkers(candleSeries, []);
 
@@ -418,6 +514,7 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
       paneObserver.disconnect();
       chart.remove();
       chartRef.current = null;
+      candleSeriesRef.current = null;
       markersPluginRef.current = null;
       srLinesRef.current = [];
     };
@@ -426,6 +523,8 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
   // push data
   useEffect(() => {
     if (!candles || !computed || !chartRef.current) return;
+    // Don't paint the previous timeframe's candles while its replacement is in flight.
+    if (candlesTimeframe !== timeframe) return;
     const s = seriesRef.current;
     const times = candles.t as number[];
 
@@ -551,6 +650,7 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
     markersPluginRef.current?.setMarkers(markers);
   }, [
     candles,
+    candlesTimeframe,
     computed,
     showMa1,
     showMa2,
@@ -564,6 +664,21 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
     avgCost,
     timeframe,
   ]);
+
+  // The live print moves only the candle series, not the whole dataset: re-running the
+  // indicator pipeline every three seconds would burn CPU and still leave the plotted
+  // MAs/RSI describing the last fetched close rather than a one-tick blip. Volume and
+  // the full OHLC correction arrive with the next candle refresh.
+  useEffect(() => {
+    if (!liveBar || !candleSeriesRef.current) return;
+    candleSeriesRef.current.update({
+      time: liveBar.time as UTCTimestamp,
+      open: liveBar.open,
+      high: liveBar.high,
+      low: liveBar.low,
+      close: liveBar.close,
+    });
+  }, [liveBar]);
 
   // Scope the default view to what the selected tab means (e.g. "1D" opens on the last
   // day) without discarding the rest of the fetched history — zooming/panning out still
@@ -628,27 +743,33 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
   }, [timeIndex]);
 
   const readout = useMemo(() => {
-    if (!candles || candles.t.length === 0) return null;
+    if (!candles || candles.t.length === 0 || candlesTimeframe !== timeframe) return null;
     const i =
       hoverIndex !== null && hoverIndex >= 0 && hoverIndex < candles.t.length
         ? hoverIndex
         : candles.t.length - 1;
-    const prevClose = i > 0 ? candles.c[i - 1] : candles.o[i];
-    const change = candles.c[i] - prevClose;
+    const liveAtI = liveBar && liveBar.index === i ? liveBar : null;
+    const open = liveAtI?.open ?? candles.o[i];
+    const high = liveAtI?.high ?? candles.h[i];
+    const low = liveAtI?.low ?? candles.l[i];
+    const close = liveAtI?.close ?? candles.c[i];
+    const prevClose = i > 0 ? candles.c[i - 1] : open;
+    const change = close - prevClose;
     return {
       live: hoverIndex === null,
+      liveTick: liveAtI !== null,
       time: candles.t[i],
-      open: candles.o[i],
-      high: candles.h[i],
-      low: candles.l[i],
-      close: candles.c[i],
+      open,
+      high,
+      low,
+      close,
       volume: candles.v[i],
       change,
       changePercent: prevClose === 0 ? 0 : (change / prevClose) * 100,
       rsi: computed?.rsi[i] ?? null,
       macd: computed?.macd.macd[i] ?? null,
     };
-  }, [candles, computed, hoverIndex]);
+  }, [candles, candlesTimeframe, computed, hoverIndex, liveBar, timeframe]);
 
   // The indicator-parameter popover is a floating panel over the chart; leaving it open
   // when the owner's attention has clearly moved on (click elsewhere, Esc) just covers
@@ -682,7 +803,9 @@ export function PriceChart({ symbol = "NVDA", timeframe }: PriceChartProps) {
               <span className="max-lg:order-1 text-text-muted">
                 {formatBarTime(readout.time, timeframe)}
                 {readout.live && (
-                  <span className="ml-1.5 text-ch-price max-lg:hidden">· ล่าสุด</span>
+                  <span className="ml-1.5 text-ch-price max-lg:hidden">
+                    · {readout.liveTick ? "สด" : "ล่าสุด"}
+                  </span>
                 )}
               </span>
               <ReadoutValue label="O" value={readout.open.toFixed(2)} className="max-lg:order-4" />

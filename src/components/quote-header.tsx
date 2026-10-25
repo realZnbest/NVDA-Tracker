@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowDown, IconArrowUp, IconSearch, IconStar } from "./icons";
 import { NotificationBell } from "./notification-bell";
 import { SymbolSearchInput, type SymbolSearchResult } from "./symbol-search-input";
 import { TickerLogo } from "./ticker-logo";
 import { useAlertsContext } from "./alerts-provider";
-import { usePoll } from "@/lib/use-poll";
+import { useLiveQuote } from "./live-quote-provider";
 import type { FinnhubQuote } from "@/lib/finnhub";
 import type { ExtendedHoursQuote } from "@/lib/yahoo";
 import type { WatchlistItem } from "@/lib/types";
@@ -50,9 +50,7 @@ function exchangeLabel(name: string): string {
 export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
   const router = useRouter();
   const { authStatus } = useAlertsContext();
-  const [quote, setQuote] = useState<FinnhubQuote | null>(null);
-  const [extended, setExtended] = useState<ExtendedHoursQuote | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
+  const { quote, extended, status } = useLiveQuote();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileQuery, setMobileQuery] = useState("");
   const [following, setFollowing] = useState<boolean | null>(null);
@@ -63,21 +61,6 @@ export function QuoteHeader({ symbol = "NVDA" }: { symbol?: string }) {
     setMobileSearchOpen(false);
     router.push(`/dashboard/${result.symbol}`);
   }
-
-  const load = useCallback(() => {
-    fetch(`/api/quote?symbol=${symbol}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error === "MISSING_API_KEY") return setStatus("no_key");
-        if (data.error || !data.quote) return setStatus("error");
-        setQuote(data.quote);
-        setExtended(data.extended ?? null);
-        setStatus("ready");
-      })
-      .catch(() => setStatus("error"));
-  }, [symbol]);
-
-  usePoll(load, 3_000);
 
   // Follow state is private. Only ask for it inside an authenticated owner session;
   // unauthenticated visitors still get the star as a doorway to the watchlist page.

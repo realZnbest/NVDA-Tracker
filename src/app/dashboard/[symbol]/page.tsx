@@ -1,4 +1,5 @@
 import { DashboardView } from "@/components/dashboard-view";
+import { LiveQuoteProvider } from "@/components/live-quote-provider";
 
 export default async function DashboardSymbolPage({
   params,
@@ -6,5 +7,10 @@ export default async function DashboardSymbolPage({
   params: Promise<{ symbol: string }>;
 }) {
   const { symbol: rawSymbol } = await params;
-  return <DashboardView symbol={rawSymbol.toUpperCase()} />;
+  const symbol = rawSymbol.toUpperCase();
+  return (
+    <LiveQuoteProvider key={symbol} symbol={symbol}>
+      <DashboardView symbol={symbol} />
+    </LiveQuoteProvider>
+  );
 }

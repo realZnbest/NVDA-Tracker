@@ -46,6 +46,7 @@ export function WatchlistRail({
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [quotes, setQuotes] = useState<Record<string, WatchlistQuote>>({});
   const [marketQuotes, setMarketQuotes] = useState<Record<string, MarketQuote>>({});
+  const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,10 +72,18 @@ export function WatchlistRail({
   const loadQuotes = useCallback(async () => {
     try {
       const res = await fetch("/api/watchlist/quotes", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = (await res.json()) as { quotes?: Record<string, WatchlistQuote> };
+      if (!res.ok) {
+        setLive(false);
+        return;
+      }
+      const data = (await res.json()) as {
+        quotes?: Record<string, WatchlistQuote>;
+        live?: boolean;
+      };
       setQuotes(data.quotes ?? {});
+      setLive(Boolean(data.live));
     } catch {
+      setLive(false);
       // Keep the last good quote rather than blanking the rail on a hiccup.
     }
   }, []);
@@ -127,6 +136,7 @@ export function WatchlistRail({
     } else {
       setItems([]);
       setQuotes({});
+      setLive(false);
       loadMarket().finally(() => !cancelled && setLoading(false));
     }
 
@@ -140,7 +150,14 @@ export function WatchlistRail({
     void loadQuotes();
   }, [authed, items, loadQuotes]);
 
-  usePoll(loadQuotes, 60_000, { enabled: authed && items.length > 0, leading: false });
+  // The batched watchlist route is cheap while websocket ticks are flowing (its REST
+  // base is only refreshed every five minutes), so the cockpit rail can afford the same
+  // near-live feel as the full page. Without fresh ticks there is nothing to animate,
+  // so fall back to a minute and save the requests.
+  usePoll(loadQuotes, live ? 10_000 : 60_000, {
+    enabled: authed && items.length > 0,
+    leading: false,
+  });
   usePoll(loadMarket, 60_000, {
     enabled: !authed && authStatus !== "checking",
     leading: false,

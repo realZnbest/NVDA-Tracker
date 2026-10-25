@@ -226,7 +226,7 @@ export function MarketHeatmapView() {
   }, [load]);
 
   const refreshMs = data?.session === "closed" ? CLOSED_REFRESH_MS : LIVE_REFRESH_MS;
-  usePoll(() => void load("poll"), refreshMs, {
+  usePoll(() => load("poll"), refreshMs, {
     enabled: data !== null,
     leading: false,
   });

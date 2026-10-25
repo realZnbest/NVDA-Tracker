@@ -29,7 +29,10 @@ interface WsState {
   connecting: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   watchdog: ReturnType<typeof setInterval> | null;
-  lastActivity: number;
+  /** Last protocol-level pong from Finnhub — the only reliable liveness signal. */
+  lastPongAt: number;
+  /** Last protocol-level ping we sent, so we don't ping on every watchdog tick. */
+  lastPingAt: number;
 }
 
 /**
@@ -53,35 +56,61 @@ function state(): WsState {
       connecting: false,
       reconnectTimer: null,
       watchdog: null,
-      lastActivity: Date.now(),
+      lastPongAt: 0,
+      lastPingAt: 0,
     };
   }
-  return globalForWs.__finnhubWs;
+  const existing = globalForWs.__finnhubWs;
+  // A dev hot reload can keep an old state object alive across the module swap; fill in
+  // fields added since it was built so the watchdog never compares against `undefined`.
+  existing.lastPongAt ??= Date.now();
+  existing.lastPingAt ??= 0;
+  return existing;
 }
 
 /**
  * Idle TCP connections behind NATs/load balancers can die without ever firing `close`
  * or `error` — the socket just stops delivering trades while `readyState` still reports
  * OPEN. Left unchecked that reads as "the market went quiet" for however long the owner
- * has the tab open, which is a much worse failure mode than a normal reconnect. This
- * watchdog force-closes a connection that's gone silent so `close` fires and the normal
- * reconnect path picks it back up.
+ * has the tab open, which is a much worse failure mode than a normal reconnect.
+ *
+ * Liveness cannot be inferred from trade messages: Finnhub sends one application-level
+ * `{"type":"ping"}` right after subscribing and then stays silent when no subscribed
+ * symbol trades (nights, weekends, illiquid names). Using that as the heartbeat made
+ * the watchdog kill a healthy socket every 45s. We instead send a protocol-level ping
+ * and wait for its pong; Finnhub answers those in well under a second even when the
+ * market is closed. This detects a genuinely dead TCP connection without reconnect
+ * churn while the feed is merely quiet.
  */
-const STALE_AFTER_MS = 45_000;
+const STALE_AFTER_MS = 50_000;
+const PING_EVERY_MS = 20_000;
+const WATCHDOG_EVERY_MS = 10_000;
 
 function ensureWatchdog() {
   const s = state();
   if (s.watchdog) return;
   s.watchdog = setInterval(() => {
-    if (s.socket && Date.now() - s.lastActivity > STALE_AFTER_MS) {
+    const socket = s.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    const now = Date.now();
+    if (now - s.lastPongAt > STALE_AFTER_MS) {
       console.warn(
-        "[finnhub-ws] no messages in",
-        STALE_AFTER_MS,
+        "[finnhub-ws] no pong in",
+        now - s.lastPongAt,
         "ms — terminating stale connection"
       );
-      s.socket.terminate();
+      socket.terminate();
+      return;
     }
-  }, 15_000);
+    if (now - s.lastPingAt >= PING_EVERY_MS) {
+      s.lastPingAt = now;
+      try {
+        socket.ping();
+      } catch {
+        socket.terminate();
+      }
+    }
+  }, WATCHDOG_EVERY_MS);
   s.watchdog.unref();
 }
 
@@ -118,18 +147,23 @@ function connect() {
   ws.on("open", () => {
     s.connecting = false;
     s.socket = ws;
-    s.lastActivity = Date.now();
+    // Start the liveness clock at connect; the first protocol ping goes out on the
+    // next watchdog tick, and a pong must come back before STALE_AFTER_MS.
+    s.lastPongAt = Date.now();
+    s.lastPingAt = 0;
     for (const symbol of s.subscribed) {
       ws.send(JSON.stringify({ type: "subscribe", symbol }));
     }
   });
 
   ws.on("ping", () => {
-    s.lastActivity = Date.now();
+    s.lastPongAt = Date.now();
+  });
+  ws.on("pong", () => {
+    s.lastPongAt = Date.now();
   });
 
   ws.on("message", (raw) => {
-    s.lastActivity = Date.now();
     let msg: { type?: string; data?: Array<{ s: string; p: number; t: number }> };
     try {
       msg = JSON.parse(raw.toString());

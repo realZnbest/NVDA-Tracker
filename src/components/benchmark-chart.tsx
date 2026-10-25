@@ -10,13 +10,16 @@ import {
 } from "lightweight-charts";
 import { scopeCandles, type TimeframeKey } from "@/lib/timeframes";
 import { usePoll } from "@/lib/use-poll";
+import { useLiveQuote } from "./live-quote-provider";
 import type { FinnhubCandles } from "@/lib/finnhub";
 
 const SP500_SYMBOL = "SPY";
 const NASDAQ_SYMBOL = "QQQ";
 
-/** Matches the price chart's cadence so both panels describe the same moment. */
-const REFRESH_INTERVAL_MS = 60_000;
+/** Matches the price chart's cadence while a session is trading; slower when shut,
+ *  because no candle can change overnight and each refresh is three Yahoo calls. */
+const LIVE_REFRESH_INTERVAL_MS = 60_000;
+const CLOSED_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 const CH = {
   price: "#79b900",
@@ -59,7 +62,11 @@ export function BenchmarkChart({
   const nvdaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const sp500SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const nasdaqSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  /** Monotonic id + abort, so a timeframe switch cannot be overwritten by its predecessor. */
+  const requestRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
+  const { extended } = useLiveQuote();
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no_key">("loading");
   const [nvdaChange, setNvdaChange] = useState<number | null>(null);
   const [sp500Change, setSp500Change] = useState<number | null>(null);
@@ -111,19 +118,24 @@ export function BenchmarkChart({
 
   // Same split as the main price chart: a timeframe change is a visible reload that
   // re-fits the view, the periodic refresh silently tops up the three series without
-  // flashing a loading state or yanking the view out from under a pan.
+  // flashing a loading state or yanking the view out from under a pan. Aborting the
+  // previous request keeps a slow old timeframe from landing on top of a new one.
   const load = useCallback(
     (mode: "initial" | "refresh") => {
-      const cancelledRef = { current: false };
+      const id = ++requestRef.current;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const init = { cache: "no-store" as const, signal: controller.signal };
       if (mode === "initial") setStatus("loading");
 
-      Promise.all([
-        fetch(`/api/candles?tf=${timeframe}&symbol=${symbol}`).then((r) => r.json()),
-        fetch(`/api/candles?tf=${timeframe}&symbol=${SP500_SYMBOL}`).then((r) => r.json()),
-        fetch(`/api/candles?tf=${timeframe}&symbol=${NASDAQ_SYMBOL}`).then((r) => r.json()),
+      return Promise.all([
+        fetch(`/api/candles?tf=${timeframe}&symbol=${symbol}`, init).then((r) => r.json()),
+        fetch(`/api/candles?tf=${timeframe}&symbol=${SP500_SYMBOL}`, init).then((r) => r.json()),
+        fetch(`/api/candles?tf=${timeframe}&symbol=${NASDAQ_SYMBOL}`, init).then((r) => r.json()),
       ])
         .then(([nvdaData, sp500Data, nasdaqData]) => {
-          if (cancelledRef.current) return;
+          if (id !== requestRef.current) return;
           if (nvdaData.error === "MISSING_API_KEY") {
             if (mode === "initial") setStatus("no_key");
             return;
@@ -154,23 +166,27 @@ export function BenchmarkChart({
           setNasdaqChange(nasdaqPct.length > 0 ? nasdaqPct[nasdaqPct.length - 1].value : null);
           setStatus("ready");
         })
-        .catch(() => {
-          if (!cancelledRef.current && mode === "initial") setStatus("error");
+        .catch((err) => {
+          if ((err as Error).name === "AbortError") return;
+          if (id !== requestRef.current) return;
+          if (mode === "initial") setStatus("error");
         });
-
-      return () => {
-        cancelledRef.current = true;
-      };
     },
     [timeframe, symbol]
   );
 
-  useEffect(() => load("initial"), [load]);
-
-  const refresh = useCallback(() => {
-    load("refresh");
+  useEffect(() => {
+    void load("initial");
+    return () => abortRef.current?.abort();
   }, [load]);
-  usePoll(refresh, REFRESH_INTERVAL_MS, { leading: false });
+
+  const refresh = useCallback(() => load("refresh"), [load]);
+  const refreshMs =
+    extended?.session === "closed" ? CLOSED_REFRESH_INTERVAL_MS : LIVE_REFRESH_INTERVAL_MS;
+  usePoll(refresh, refreshMs, {
+    leading: false,
+    enabled: status !== "loading",
+  });
 
   const overlayText =
     status === "loading"
