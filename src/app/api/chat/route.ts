@@ -98,6 +98,9 @@ async function buildChatContext(symbol: string): Promise<string> {
       `บทวิเคราะห์ปัจจัยพื้นฐาน (P/E, P/S, อัตรากำไร, การเติบโต):\n${read.fundamental.map((l) => `- ${l}`).join("\n")}`
     );
     parts.push(`ภาพรวมสัญญาณ: ${read.verdictText}`);
+    if (read.conflicts.length > 0) {
+      parts.push(`สัญญาณที่ขัดกัน:\n${read.conflicts.map((l) => `- ${l}`).join("\n")}`);
+    }
   } catch {
     // omit — this piece failing shouldn't block quote/news/reported-financials context
   }

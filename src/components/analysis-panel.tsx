@@ -13,6 +13,12 @@ const VERDICT_TH: Record<AnalysisRead["verdict"], { label: string; color: string
   mixed: { label: "สัญญาณผสม", color: "#e3a94b" },
 };
 
+const AGREEMENT_TH: Record<AnalysisRead["agreement"], string> = {
+  high: "สูง",
+  medium: "ปานกลาง",
+  low: "ต่ำ",
+};
+
 interface PositionRead {
   shares: number;
   avgCost: number;
@@ -135,7 +141,15 @@ export function AnalysisPanel({
             </span>
             <VerdictScale verdict={read.verdict} label={verdict.label} color={verdict.color} />
             <p className="text-[12.5px] leading-relaxed text-text-secondary">{read.verdictText}</p>
+            <p className="flex items-baseline gap-1.5 text-[10px] text-text-muted">
+              ความสอดคล้องของสัญญาณ
+              <span className="telemetry text-text-secondary">{AGREEMENT_TH[read.agreement]}</span>
+            </p>
           </div>
+
+          {read.conflicts.length > 0 && (
+            <ReadSection title="สัญญาณที่ขัดกัน" color="#e3a94b" lines={read.conflicts} />
+          )}
 
           <ReadSection title="ด้านเทคนิค" color="var(--ch-rsi)" lines={read.technical} />
           <ReadSection
@@ -177,6 +191,7 @@ export function AnalysisPanel({
 
           <p className="border-t border-seam pt-2 text-[10px] leading-relaxed text-text-muted">
             บทวิเคราะห์นี้สร้างจากกฎที่ตั้งไว้ล่วงหน้า ไม่ใช่คำแนะนำการลงทุน
+            การทดสอบย้อนหลังไม่พบว่าคะแนนฝั่งเทคนิคทำนายทิศทางราคาได้
             โปรดใช้ประกอบการตัดสินใจของคุณเอง
           </p>
         </div>

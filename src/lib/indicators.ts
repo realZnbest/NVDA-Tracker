@@ -150,6 +150,55 @@ export function lastValid(values: (number | null)[]): number | null {
   return null;
 }
 
+/** Average true range (Wilder smoothing), seeded with the simple mean of the first `period` true ranges. */
+export function atr(
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period = 14
+): (number | null)[] {
+  const out: (number | null)[] = new Array(closes.length).fill(null);
+  if (closes.length <= period) return out;
+
+  const trueRange = (i: number) =>
+    Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1])
+    );
+
+  let sum = 0;
+  for (let i = 1; i <= period; i++) sum += trueRange(i);
+  let prev = sum / period;
+  out[period] = prev;
+  for (let i = period + 1; i < closes.length; i++) {
+    prev = (prev * (period - 1) + trueRange(i)) / period;
+    out[i] = prev;
+  }
+  return out;
+}
+
+/**
+ * Collapses daily closes into one close per calendar week (the last bar of each ISO week,
+ * weeks starting Monday UTC). A week still in progress contributes its latest close, so the
+ * final value tracks the current price rather than lagging to last Friday.
+ */
+export function weeklyCloses(timestamps: number[], closes: number[]): number[] {
+  const out: number[] = [];
+  let currentWeek = -1;
+  for (let i = 0; i < closes.length; i++) {
+    // 1970-01-01 was a Thursday; shifting by 3 days aligns week boundaries to Monday.
+    const week = Math.floor((timestamps[i] / 86400 + 3) / 7);
+    if (week !== currentWeek) {
+      out.push(closes[i]);
+      currentWeek = week;
+    } else {
+      out[out.length - 1] = closes[i];
+    }
+  }
+  return out;
+}
+
 /** Moving average of a series that already has leading nulls (e.g. an RSI line), keeping the same alignment. */
 export function movingAverageOf(
   series: (number | null)[],

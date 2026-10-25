@@ -23,7 +23,7 @@ import {
   type SRLevel,
   type StructureEvent,
 } from "./indicators";
-import { synthesize, type AnalysisRead } from "./analysis";
+import { deriveDailyContext, deriveValuationContext, synthesize, type AnalysisRead } from "./analysis";
 import {
   computeAggregatePositionsBySymbol,
   computePositionMetrics,
@@ -319,6 +319,9 @@ async function collectSymbol(
   try {
     // synthesize() rather than getAnalysisRead(): the candles, quote and financials are
     // already in hand here, and getAnalysisRead would re-fetch all of them.
+    const valuation = basic
+      ? await deriveValuationContext(symbol, basic, fundamentals.peTTM)
+      : {};
     read = synthesize(
       {
         price,
@@ -332,6 +335,7 @@ async function collectSymbol(
         ma200: technical.ma200,
         bollingerUpper: technical.bollingerUpper,
         bollingerLower: technical.bollingerLower,
+        ...deriveDailyContext(candles, price),
       },
       {
         peTTM: fundamentals.peTTM,
@@ -343,6 +347,7 @@ async function collectSymbol(
         week52High: fundamentals.week52High,
         week52Low: fundamentals.week52Low,
         price,
+        ...valuation,
       },
       "รายวัน"
     );
