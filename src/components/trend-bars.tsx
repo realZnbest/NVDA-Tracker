@@ -1,5 +1,7 @@
 "use client";
 
+import { computeBarGeometry } from "@/lib/trend-bars-geometry";
+
 export function TrendBars({
   data,
   color,
@@ -9,35 +11,27 @@ export function TrendBars({
   color: string;
   formatValue: (v: number) => string;
 }) {
-  const values = data.map((d) => d.value ?? 0);
-  const max = Math.max(...values, 0);
-  const min = Math.min(...values, 0);
-  const range = max - min || 1;
+  const { bars } = computeBarGeometry(data.map((d) => d.value));
   const width = 100;
   const height = 46;
-  const barWidth = width / data.length;
-  const zeroY = height - ((0 - min) / range) * height;
 
   return (
     <div>
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height: 90 }} preserveAspectRatio="none">
-        {data.map((d, i) => {
-          if (d.value === null) return null;
-          const barHeight = (Math.abs(d.value) / range) * height;
-          const y = d.value >= 0 ? zeroY - barHeight : zeroY;
-          return (
+        {bars.map((bar, i) =>
+          bar ? (
             <rect
               key={i}
-              x={i * barWidth + barWidth * 0.18}
-              y={y}
-              width={barWidth * 0.64}
-              height={Math.max(barHeight, 0.6)}
+              x={bar.x}
+              y={bar.y}
+              width={bar.width}
+              height={bar.height}
               fill={color}
               opacity={i === data.length - 1 ? 1 : 0.55}
               rx={0.5}
             />
-          );
-        })}
+          ) : null
+        )}
       </svg>
       <div className="flex justify-between telemetry text-[0.5625rem] text-text-muted mt-1">
         <span>{data[0]?.label}</span>
